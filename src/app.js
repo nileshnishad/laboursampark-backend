@@ -12,6 +12,7 @@ import cors from "cors";
 
 import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
+import inquiryRoutes from "./routes/inquiryRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -67,6 +68,9 @@ app.use("/auth", userRoutes);
 
 // Document Routes
 app.use("/api/documents", documentRoutes);
+
+// Inquiry Routes
+app.use("/api/inquiries", inquiryRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
