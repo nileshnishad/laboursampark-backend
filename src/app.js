@@ -62,15 +62,31 @@ app.get("/api/health", (req, res) => {
 // 🛣️ API ROUTES CONFIGURATION
 // ==========================================
 
+// ==========================================
+// 🟢 PUBLIC ROUTES (No Authentication Required)
+// ==========================================
+
 // Authentication & User Routes
+// POST /api/users/register - Register new user (PUBLIC)
+// POST /api/users/login - Login user (PUBLIC)
 app.use("/api/users", userRoutes);
 app.use("/auth", userRoutes);
 
+// ==========================================
+// 🔒 PROTECTED & MIXED ROUTES
+// ==========================================
+
+// User Profile Routes
+// GET/POST /api/users/profile - Get user profile (PROTECTED)
+
+// Inquiry Routes (submission is PUBLIC, others are PROTECTED)
+// POST /api/inquiries - Submit inquiry (PUBLIC)
+// GET /api/inquiries - Get all inquiries (PROTECTED)
+// PUT/DELETE /api/inquiries/:id - Update/Delete inquiries (PROTECTED)
+app.use("/api/inquiries", inquiryRoutes);
+
 // Document Routes
 app.use("/api/documents", documentRoutes);
-
-// Inquiry Routes
-app.use("/api/inquiries", inquiryRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
