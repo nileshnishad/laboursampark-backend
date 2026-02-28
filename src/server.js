@@ -25,8 +25,13 @@ app.use("/auth", userRoutes);
 // Document Routes
 app.use("/api/documents", documentRoutes);
 
-const PORT = process.env.PORT || 5000;
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Export for Vercel serverless
+export default app;
