@@ -19,7 +19,7 @@
   "env": {
     "NODE_ENV": "production",
     "MONGO_URI": "mongodb+srv://nnishad83_db_user:gboTaoJImju8fTsV@labour123.sao1o1t.mongodb.net/labour123?retryWrites=true&w=majority",
-    "JWT_SECRET": "nnishad83_db_user",
-    "JWT_EXPIRES_IN": "1d"
+    "JWT_SECRET": "@labour_sampark_secret_key_2025#",
+    "JWT_EXPIRES_IN": "7d"
   }
 }
