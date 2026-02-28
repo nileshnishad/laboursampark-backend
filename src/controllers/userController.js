@@ -330,3 +330,161 @@ export const login = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// 👤 GET USER PROFILE
+// ==========================================
+
+export const getProfile = async (req, res) => {
+  try {
+    // Get userId from authenticated token (middleware extracts it)
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Prepare comprehensive user profile data
+    const userData = user.toJSON();
+
+    const profileData = {
+      // Authentication & Basic Info
+      _id: userData._id,
+      fullName: userData.fullName,
+      email: userData.email,
+      mobile: userData.mobile,
+      userType: userData.userType,
+
+      // Profile & Media
+      profilePhotoUrl: userData.profilePhotoUrl,
+      display: userData.display,
+
+      // Professional Information
+      age: userData.age,
+      experience: userData.experience,
+      experienceRange: userData.experienceRange,
+      bio: userData.bio,
+      skills: userData.skills,
+      about: userData.about,
+
+      // Location Information
+      location: userData.location,
+
+      // Work Information
+      workTypes: userData.workTypes,
+      workingHours: userData.workingHours,
+      serviceCategories: userData.serviceCategories,
+      serviceCover: userData.serviceCover,
+      servicesOffered: userData.servicesOffered,
+      coverageArea: userData.coverageArea,
+      serviceRadius: userData.serviceRadius,
+
+      // Ratings & Reviews
+      rating: userData.rating,
+      totalReviews: userData.totalReviews,
+      completedJobs: userData.completedJobs,
+
+      // Verification Status
+      isVerified: userData.isVerified,
+      emailVerified: userData.emailVerified,
+      mobileVerified: userData.mobileVerified,
+      aadharVerified: userData.aadharVerified,
+      panVerified: userData.panVerified,
+      licenseVerified: userData.licenseVerified,
+
+      // Contractor Specific
+      companyName: userData.companyName,
+      aboutCompany: userData.aboutCompany,
+      gstNumber: userData.gstNumber,
+      registrationNumber: userData.registrationNumber,
+      companyLogoUrl: userData.companyLogoUrl,
+      businessLicenseUrl: userData.businessLicenseUrl,
+
+      // Labour Specific
+      aadharNumber: userData.aadharNumber,
+      businessName: userData.businessName,
+      businessType: userData.businessType,
+
+      // Banking Information
+      bankDetails: userData.bankDetails,
+
+      // Availability & Status
+      availability: userData.availability,
+      status: userData.status,
+      isOnline: userData.isOnline,
+      termsAgreed: userData.termsAgreed,
+
+      // Rates & Pricing
+      hourlyRate: userData.hourlyRate,
+      dayRate: userData.dayRate,
+      projectRate: userData.projectRate,
+      minimumJobValue: userData.minimumJobValue,
+
+      // Additional Information
+      teamSize: userData.teamSize,
+      preferredLanguages: userData.preferredLanguages,
+      preferredContactMethod: userData.preferredContactMethod,
+
+      // Portfolio & Certifications
+      certifications: userData.certifications,
+      portfolioProjects: userData.portfolioProjects,
+
+      // Performance Metrics
+      averageResponseTime: userData.averageResponseTime,
+      acceptanceRate: userData.acceptanceRate,
+      cancellationRate: userData.cancellationRate,
+      onTimeCompletionRate: userData.onTimeCompletionRate,
+
+      // Earnings
+      totalEarnings: userData.totalEarnings,
+      pendingEarnings: userData.pendingEarnings,
+      withdrawnEarnings: userData.withdrawnEarnings,
+
+      // Insurance (Contractor)
+      insuranceDetails: userData.insuranceDetails,
+
+      // Subscription
+      subscriptionPlan: userData.subscriptionPlan,
+      planExpiryDate: userData.planExpiryDate,
+      planStartDate: userData.planStartDate,
+
+      // Social & Referral
+      socialLinks: userData.socialLinks,
+      referralCode: userData.referralCode,
+      referralCount: userData.referralCount,
+
+      // Emergency Contact
+      emergencyContact: userData.emergencyContact,
+
+      // Metadata
+      lastLogin: userData.lastLogin,
+      createdAt: userData.createdAt,
+      updatedAt: userData.updatedAt,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "User profile retrieved successfully",
+      data: profileData,
+    });
+  } catch (error) {
+    console.error("Get profile error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while retrieving profile",
+      error: error.message,
+    });
+  }
+};

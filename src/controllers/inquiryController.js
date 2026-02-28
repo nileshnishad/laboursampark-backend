@@ -57,10 +57,10 @@ export const submitInquiry = async (req, res) => {
       subject: subject.trim(),
       message: message.trim(),
       inquiryType: inquiryType || "general",
-      userType: userType || "guest",
+      userType: userType || req.user?.userType || "guest",
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get("user-agent"),
-      userId: req.user?._id || null,
+      userId: req.user?.userId || null, // Capture userId from authenticated middleware
     };
 
     const inquiry = new Inquiry(inquiryData);

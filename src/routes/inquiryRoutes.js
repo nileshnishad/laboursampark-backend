@@ -7,6 +7,7 @@ import {
   deleteInquiry,
   getInquiryStats,
 } from "../controllers/inquiryController.js";
+import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -14,22 +15,22 @@ const router = express.Router();
 // 📝 INQUIRY ROUTES
 // ==========================================
 
-// POST /api/inquiries - Submit new inquiry (public)
-router.post("/", submitInquiry);
+// POST /api/inquiries - Submit new inquiry (PUBLIC - no auth required)
+router.post("/", publicEndpoint, submitInquiry);
 
-// GET /api/inquiries - Get all inquiries (admin)
-router.get("/", getAllInquiries);
+// GET /api/inquiries - Get all inquiries (PROTECTED - requires auth)
+router.get("/", authenticateToken, getAllInquiries);
 
-// GET /api/inquiries/stats - Get inquiry statistics (admin)
-router.get("/stats", getInquiryStats);
+// GET /api/inquiries/stats - Get inquiry statistics (PROTECTED - requires auth)
+router.get("/stats", authenticateToken, getInquiryStats);
 
-// GET /api/inquiries/:id - Get inquiry by ID (admin)
-router.get("/:id", getInquiryById);
+// GET /api/inquiries/:id - Get inquiry by ID (PROTECTED - requires auth)
+router.get("/:id", authenticateToken, getInquiryById);
 
-// PUT /api/inquiries/:id - Update inquiry (admin)
-router.put("/:id", updateInquiry);
+// PUT /api/inquiries/:id - Update inquiry (PROTECTED - requires auth)
+router.put("/:id", authenticateToken, updateInquiry);
 
-// DELETE /api/inquiries/:id - Delete inquiry (admin)
-router.delete("/:id", deleteInquiry);
+// DELETE /api/inquiries/:id - Delete inquiry (PROTECTED - requires auth)
+router.delete("/:id", authenticateToken, deleteInquiry);
 
 export default router;
