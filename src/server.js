@@ -1,37 +1,33 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
+import app from "./app.js";
 import connectDB from "./config/db.js";
-import userRoutes from "./routes/userRoutes.js";
-import documentRoutes from "./routes/documentRoutes.js";
 
-dotenv.config();
-connectDB();
+// ==========================================
+// 🗄️ DATABASE CONNECTION
+// ==========================================
 
-const app = express();
+(async () => {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB Connected Successfully");
+  } catch (error) {
+    console.error("❌ MongoDB Connection Failed:", error);
+  }
+})();
 
-app.use(cors({ origin: '*' }));
-app.use(express.json());
+// ==========================================
+// 🚀 LOCAL DEVELOPMENT SERVER
+// ==========================================
 
-app.get("/", (req, res) => {
-  res.json({ message: "LabourSampark API Running" });
-});
-
-// User Routes
-console.log("server log");
-
-app.use("/auth", userRoutes);
-
-// Document Routes
-app.use("/api/documents", documentRoutes);
-
-// For local development
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`✅ Server running on port ${PORT}`);
   });
 }
 
-// Export for Vercel serverless
+// ==========================================
+// 🚀 EXPORT FOR VERCEL DEPLOYMENT
+// ==========================================
+
 export default app;
+
