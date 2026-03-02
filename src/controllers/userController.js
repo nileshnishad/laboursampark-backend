@@ -340,10 +340,20 @@ export const getProfile = async (req, res) => {
     // Get userId from authenticated token (middleware extracts it)
     const userId = req.userId;
 
+    console.log("Getting profile for userId:", userId);
+
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: "Authentication required. Please login first.",
+      });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
       });
     }
 
@@ -356,131 +366,26 @@ export const getProfile = async (req, res) => {
       });
     }
 
-    // Prepare comprehensive user profile data
+    // Get clean user data without sensitive fields
     const userData = user.toJSON();
 
-    const profileData = {
-      // Authentication & Basic Info
-      _id: userData._id,
-      fullName: userData.fullName,
-      email: userData.email,
-      mobile: userData.mobile,
-      userType: userData.userType,
-
-      // Profile & Media
-      profilePhotoUrl: userData.profilePhotoUrl,
-      display: userData.display,
-
-      // Professional Information
-      age: userData.age,
-      experience: userData.experience,
-      experienceRange: userData.experienceRange,
-      bio: userData.bio,
-      skills: userData.skills,
-      about: userData.about,
-
-      // Location Information
-      location: userData.location,
-
-      // Work Information
-      workTypes: userData.workTypes,
-      workingHours: userData.workingHours,
-      serviceCategories: userData.serviceCategories,
-      serviceCover: userData.serviceCover,
-      servicesOffered: userData.servicesOffered,
-      coverageArea: userData.coverageArea,
-      serviceRadius: userData.serviceRadius,
-
-      // Ratings & Reviews
-      rating: userData.rating,
-      totalReviews: userData.totalReviews,
-      completedJobs: userData.completedJobs,
-
-      // Verification Status
-      isVerified: userData.isVerified,
-      emailVerified: userData.emailVerified,
-      mobileVerified: userData.mobileVerified,
-      aadharVerified: userData.aadharVerified,
-      panVerified: userData.panVerified,
-      licenseVerified: userData.licenseVerified,
-
-      // Contractor Specific
-      companyName: userData.companyName,
-      aboutCompany: userData.aboutCompany,
-      gstNumber: userData.gstNumber,
-      registrationNumber: userData.registrationNumber,
-      companyLogoUrl: userData.companyLogoUrl,
-      businessLicenseUrl: userData.businessLicenseUrl,
-
-      // Labour Specific
-      aadharNumber: userData.aadharNumber,
-      businessName: userData.businessName,
-      businessType: userData.businessType,
-
-      // Banking Information
-      bankDetails: userData.bankDetails,
-
-      // Availability & Status
-      availability: userData.availability,
-      status: userData.status,
-      isOnline: userData.isOnline,
-      termsAgreed: userData.termsAgreed,
-
-      // Rates & Pricing
-      hourlyRate: userData.hourlyRate,
-      dayRate: userData.dayRate,
-      projectRate: userData.projectRate,
-      minimumJobValue: userData.minimumJobValue,
-
-      // Additional Information
-      teamSize: userData.teamSize,
-      preferredLanguages: userData.preferredLanguages,
-      preferredContactMethod: userData.preferredContactMethod,
-
-      // Portfolio & Certifications
-      certifications: userData.certifications,
-      portfolioProjects: userData.portfolioProjects,
-
-      // Performance Metrics
-      averageResponseTime: userData.averageResponseTime,
-      acceptanceRate: userData.acceptanceRate,
-      cancellationRate: userData.cancellationRate,
-      onTimeCompletionRate: userData.onTimeCompletionRate,
-
-      // Earnings
-      totalEarnings: userData.totalEarnings,
-      pendingEarnings: userData.pendingEarnings,
-      withdrawnEarnings: userData.withdrawnEarnings,
-
-      // Insurance (Contractor)
-      insuranceDetails: userData.insuranceDetails,
-
-      // Subscription
-      subscriptionPlan: userData.subscriptionPlan,
-      planExpiryDate: userData.planExpiryDate,
-      planStartDate: userData.planStartDate,
-
-      // Social & Referral
-      socialLinks: userData.socialLinks,
-      referralCode: userData.referralCode,
-      referralCount: userData.referralCount,
-
-      // Emergency Contact
-      emergencyContact: userData.emergencyContact,
-
-      // Metadata
-      lastLogin: userData.lastLogin,
-      createdAt: userData.createdAt,
-      updatedAt: userData.updatedAt,
-    };
-
+    // Return all profile data
     res.status(200).json({
       success: true,
       message: "User profile retrieved successfully",
-      data: profileData,
+      data: userData,
     });
   } catch (error) {
-    console.error("Get profile error:", error);
+    console.error("Get profile error:", error.name, error.message);
+
+    // Handle specific MongoDB errors
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "An error occurred while retrieving profile",
@@ -497,6 +402,8 @@ export const updateProfile = async (req, res) => {
   try {
     const userId = req.userId;
 
+    console.log("Updating profile for userId:", userId);
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -504,40 +411,25 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    const updateData = req.body;
+    // Validate MongoDB ObjectId format
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    const updateData = {...req.body}; // Create copy to avoid mutating req.body
 
     // Fields that cannot be updated
     const restrictedFields = ["_id", "password", "email", "mobile", "createdAt", "resetPasswordToken", "resetPasswordExpire", "emailVerificationToken", "emailVerificationExpire"];
 
-    // Remove restricted fields from update
+    // Remove restricted fields
     restrictedFields.forEach(field => {
       delete updateData[field];
     });
 
-    // If trying to change password, use dedicated endpoint
-    if (updateData.password) {
-      return res.status(400).json({
-        success: false,
-        message: "Use /api/users/change-password endpoint to update password",
-      });
-    }
-
-    // If trying to change email or mobile, use dedicated endpoint
-    if (updateData.email || updateData.mobile) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and mobile cannot be updated. Create new account if needed.",
-      });
-    }
-
-    // Validate specific fields if provided
-    if (updateData.age && (typeof updateData.age !== "number" || updateData.age < 0)) {
-      return res.status(400).json({
-        success: false,
-        message: "Age must be a positive number",
-      });
-    }
-
+    // Quick validation for critical fields
     if (updateData.userType && !["labour", "contractor"].includes(updateData.userType)) {
       return res.status(400).json({
         success: false,
@@ -545,31 +437,6 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Validate numeric fields
-    const numericFields = ["rating", "totalReviews", "completedJobs", "hourlyRate", "dayRate", "projectRate", "minimumJobValue", "serviceRadius", "averageResponseTime", "acceptanceRate", "cancellationRate", "onTimeCompletionRate", "totalEarnings", "pendingEarnings", "withdrawnEarnings", "referralCount"];
-
-    for (const field of numericFields) {
-      if (updateData[field] !== undefined && typeof updateData[field] !== "number") {
-        return res.status(400).json({
-          success: false,
-          message: `${field} must be a number`,
-        });
-      }
-    }
-
-    // Validate boolean fields
-    const booleanFields = ["display", "isVerified", "emailVerified", "mobileVerified", "aadharVerified", "panVerified", "licenseVerified", "availability", "isOnline", "termsAgreed"];
-
-    for (const field of booleanFields) {
-      if (updateData[field] !== undefined && typeof updateData[field] !== "boolean") {
-        return res.status(400).json({
-          success: false,
-          message: `${field} must be a boolean`,
-        });
-      }
-    }
-
-    // Validate status field
     if (updateData.status && !["active", "inactive", "blocked", "suspended"].includes(updateData.status)) {
       return res.status(400).json({
         success: false,
@@ -577,7 +444,14 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Update user
+    if (updateData.age && (typeof updateData.age !== "number" || updateData.age < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Age must be a positive number",
+      });
+    }
+
+    // Update user in database
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
@@ -597,9 +471,16 @@ export const updateProfile = async (req, res) => {
       data: user.toJSON(),
     });
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error("Update profile error:", error.name, error.message);
     
-    // Handle MongoDB validation errors
+    // Handle specific MongoDB errors
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
