@@ -488,3 +488,131 @@ export const getProfile = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// ✏️ UPDATE USER PROFILE
+// ==========================================
+
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    const updateData = req.body;
+
+    // Fields that cannot be updated
+    const restrictedFields = ["_id", "password", "email", "mobile", "createdAt", "resetPasswordToken", "resetPasswordExpire", "emailVerificationToken", "emailVerificationExpire"];
+
+    // Remove restricted fields from update
+    restrictedFields.forEach(field => {
+      delete updateData[field];
+    });
+
+    // If trying to change password, use dedicated endpoint
+    if (updateData.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Use /api/users/change-password endpoint to update password",
+      });
+    }
+
+    // If trying to change email or mobile, use dedicated endpoint
+    if (updateData.email || updateData.mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and mobile cannot be updated. Create new account if needed.",
+      });
+    }
+
+    // Validate specific fields if provided
+    if (updateData.age && (typeof updateData.age !== "number" || updateData.age < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Age must be a positive number",
+      });
+    }
+
+    if (updateData.userType && !["labour", "contractor"].includes(updateData.userType)) {
+      return res.status(400).json({
+        success: false,
+        message: "userType must be either 'labour' or 'contractor'",
+      });
+    }
+
+    // Validate numeric fields
+    const numericFields = ["rating", "totalReviews", "completedJobs", "hourlyRate", "dayRate", "projectRate", "minimumJobValue", "serviceRadius", "averageResponseTime", "acceptanceRate", "cancellationRate", "onTimeCompletionRate", "totalEarnings", "pendingEarnings", "withdrawnEarnings", "referralCount"];
+
+    for (const field of numericFields) {
+      if (updateData[field] !== undefined && typeof updateData[field] !== "number") {
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be a number`,
+        });
+      }
+    }
+
+    // Validate boolean fields
+    const booleanFields = ["display", "isVerified", "emailVerified", "mobileVerified", "aadharVerified", "panVerified", "licenseVerified", "availability", "isOnline", "termsAgreed"];
+
+    for (const field of booleanFields) {
+      if (updateData[field] !== undefined && typeof updateData[field] !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be a boolean`,
+        });
+      }
+    }
+
+    // Validate status field
+    if (updateData.status && !["active", "inactive", "blocked", "suspended"].includes(updateData.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "status must be one of: active, inactive, blocked, suspended",
+      });
+    }
+
+    // Update user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: user.toJSON(),
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    
+    // Handle MongoDB validation errors
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: messages,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while updating profile",
+      error: error.message,
+    });
+  }
+};

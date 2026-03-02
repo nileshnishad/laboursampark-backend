@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, getProfile } from "../controllers/userController.js";
+import { register, login, getProfile, updateProfile } from "../controllers/userController.js";
 import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -18,8 +18,16 @@ router.post("/login", publicEndpoint, login);
 // PROTECTED ROUTES (authentication required)
 // ==========================================
 
-// GET/POST /api/users/profile - Get user profile (PROTECTED)
-router.post("/profile", authenticateToken, getProfile);
+// GET /api/users/profile - Get user profile (PROTECTED)
 router.get("/profile", authenticateToken, getProfile);
+
+// POST /api/users/profile - Get user profile (PROTECTED)
+router.post("/profile", authenticateToken, getProfile);
+
+// PUT /api/users/profile - Update user profile (PROTECTED)
+router.put("/profile", authenticateToken, updateProfile);
+
+// PATCH /api/users/profile - Partial update user profile (PROTECTED)
+router.patch("/profile", authenticateToken, updateProfile);
 
 export default router;
