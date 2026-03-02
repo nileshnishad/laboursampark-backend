@@ -8,12 +8,23 @@ export const authenticateToken = (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1]; // Extract token from "Bearer <token>"
-
-    if (!token) {
+    
+    if (!authHeader) {
       return res.status(401).json({
         success: false,
         message: "Access token is required. Please login first.",
+      });
+    }
+
+    // Extract token from "Bearer <token>"
+    const token = authHeader.startsWith("Bearer ") 
+      ? authHeader.slice(7) 
+      : authHeader;
+
+    if (!token || token.trim() === "") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token format. Use: Authorization: Bearer <token>",
       });
     }
 
@@ -23,19 +34,27 @@ export const authenticateToken = (req, res, next) => {
       process.env.JWT_SECRET || "your-secret-key"
     );
 
+    // Validate decoded token has required fields
+    if (!decoded.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token: missing userId",
+      });
+    }
+
     // Attach user info to request object
     req.user = {
       userId: decoded.userId,
-      email: decoded.email,
-      mobile: decoded.mobile,
-      userType: decoded.userType,
+      email: decoded.email || null,
+      mobile: decoded.mobile || null,
+      userType: decoded.userType || null,
     };
 
     req.userId = decoded.userId; // Easy access to userId
 
     next();
   } catch (error) {
-    console.error("Authentication error:", error.message);
+    console.error("Authentication error:", error.name, error.message);
 
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
