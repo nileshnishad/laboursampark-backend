@@ -1,5 +1,6 @@
 import express from "express";
 import { register, login, getProfile, updateProfile } from "../controllers/userController.js";
+import { getVisibleUsers } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -29,5 +30,8 @@ router.put("/profile", authenticateToken, updateProfile);
 
 // PATCH /api/users/profile - Partial update user profile (PROTECTED)
 router.patch("/profile", authenticateToken, updateProfile);
+
+// GET /api/users/visible - Get visible users (contractors/labour) (PROTECTED)
+router.get("/visible", authenticateToken, getVisibleUsers);
 
 export default router;
