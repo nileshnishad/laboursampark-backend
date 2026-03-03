@@ -63,6 +63,16 @@ export const register = async (req, res) => {
       userType: userType.toLowerCase(),
     };
 
+    // Sanitize location coordinates if present
+    if (userData.location && userData.location.coordinates) {
+      if (!userData.location.coordinates.type || userData.location.coordinates.type === "") {
+        userData.location.coordinates.type = "Point";
+      }
+      if (!Array.isArray(userData.location.coordinates.coordinates)) {
+        userData.location.coordinates.coordinates = [0, 0];
+      }
+    }
+
     const user = new User(userData);
 
     // Save user (password will be hashed by pre-save hook)

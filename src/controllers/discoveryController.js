@@ -90,6 +90,7 @@ export const getVisibleUsers = async (req, res) => {
         email: userData.email,
         userType: userData.userType,
         profilePhotoUrl: userData.profilePhotoUrl,
+        companyLogoUrl: userData.companyLogoUrl,
         bio: userData.bio,
         skills: userData.skills,
         location: userData.location,
