@@ -1,6 +1,6 @@
 import express from "express";
 import { register, login, getProfile, updateProfile } from "../controllers/userController.js";
-import { getVisibleUsers } from "../controllers/discoveryController.js";
+import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -14,6 +14,12 @@ router.post("/register", publicEndpoint, register);
 
 // POST /api/users/login - Login user (PUBLIC)
 router.post("/login", publicEndpoint, login);
+
+// GET /api/users/labours - Get all labour users with display=true (PUBLIC)
+router.get("/labours", getLabours);
+
+// GET /api/users/contractors - Get all contractor users with display=true (PUBLIC)
+router.get("/contractors", getContractors);
 
 // ==========================================
 // PROTECTED ROUTES (authentication required)
