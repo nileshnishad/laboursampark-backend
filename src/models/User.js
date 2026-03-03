@@ -261,6 +261,21 @@ const userSchema = new mongoose.Schema(
 // Index for geospatial queries
 userSchema.index({ "location.coordinates": "2dsphere" });
 
+// Validate and fix location coordinates before saving
+userSchema.pre("save", function () {
+  // Ensure coordinates.type is always valid
+  if (this.location && this.location.coordinates) {
+    if (!this.location.coordinates.type || this.location.coordinates.type === "") {
+      this.location.coordinates.type = "Point";
+    }
+    // Ensure coordinates array has valid numbers
+    if (!Array.isArray(this.location.coordinates.coordinates) || 
+        this.location.coordinates.coordinates.length === 0) {
+      this.location.coordinates.coordinates = [0, 0];
+    }
+  }
+});
+
 // Hash password before saving
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) {
