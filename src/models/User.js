@@ -100,7 +100,7 @@ const userSchema = new mongoose.Schema(
     aadharNumber: String,
     businessLicenseUrl:String,
     businessName:String,
-    businessType:[String],
+    businessTypes:[String],
     companyLogoUrl:String,
 
     // Banking Information

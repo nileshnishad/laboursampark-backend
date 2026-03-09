@@ -273,7 +273,7 @@ export const getContractors = async (req, res) => {
 
     // Build filter: contractor users with display=true
     const filter = {
-      userType: "contractor",
+      userType: ["contractor","sub_contractor"], // Show both contractors and sub-contractors
       display: true,
     };
 
@@ -345,6 +345,7 @@ export const getContractors = async (req, res) => {
         coverageArea: userData.coverageArea,
         certifications: userData.certifications,
         businessName: userData.businessName,
+        businessTypes: userData.businessTypes,
         gstNumber: userData.gstNumber,
         mobile: userData.mobile,
         preferredContactMethod: userData.preferredContactMethod,
