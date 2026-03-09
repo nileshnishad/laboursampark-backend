@@ -49,11 +49,11 @@ export const register = async (req, res) => {
     }
 
     // Validate userType
-    const validUserTypes = ["labour", "contractor"];
+    const validUserTypes = ["labour", "contractor","sub_contractor"];
     if (!validUserTypes.includes(userType.toLowerCase())) {
       return res.status(400).json({
         success: false,
-        message: "userType must be either 'labour' or 'contractor'",
+        message: "userType must be either 'labour', 'contractor' or 'sub_contractor'",
       });
     }
 
@@ -123,15 +123,6 @@ export const login = async (req, res) => {
       });
     }
 
-    // Validate userType
-    const validUserTypes = ["labour", "contractor"];
-    if (userType && !validUserTypes.includes(userType.toLowerCase())) {
-      return res.status(400).json({
-        success: false,
-        message: "userType must be either 'labour' or 'contractor'",
-      });
-    }
-
     // Find user by email or mobile
     const user = await User.findOne({
       $or: [
@@ -144,14 +135,6 @@ export const login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "User not found. Please check your email/mobile and try again",
-      });
-    }
-
-    // Verify userType if provided
-    if (userType && user.userType !== userType.toLowerCase()) {
-      return res.status(403).json({
-        success: false,
-        message: `This account is registered as '${user.userType}', but you're trying to login as '${userType.toLowerCase()}'`,
       });
     }
 
