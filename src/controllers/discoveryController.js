@@ -108,7 +108,7 @@ export const getVisibleUsers = async (req, res) => {
         coverageArea: userData.coverageArea,
         certifications: userData.certifications,
         workTypes: userData.workTypes,
-        companyName: userData.companyName, // For contractors
+        businessName: userData.businessName, // For contractors
         phoneNumber: userData.mobile, // Show mobile for visible users
         preferredContactMethod: userData.preferredContactMethod,
         socialLinks: userData.socialLinks,
@@ -344,7 +344,7 @@ export const getContractors = async (req, res) => {
         serviceCategories: userData.serviceCategories,
         coverageArea: userData.coverageArea,
         certifications: userData.certifications,
-        companyName: userData.companyName,
+        businessName: userData.businessName,
         gstNumber: userData.gstNumber,
         mobile: userData.mobile,
         preferredContactMethod: userData.preferredContactMethod,
