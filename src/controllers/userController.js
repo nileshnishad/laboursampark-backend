@@ -1,5 +1,8 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import sendEmail from "../utils/sendEmail.js";
+import { forgotPasswordTemplate } from "../utils/templates/forgotPasswordTemplate.js";
 
 // Register User
 export const register = async (req, res) => {
@@ -486,6 +489,247 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred while updating profile",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔐 FORGOT PASSWORD
+// ==========================================
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email, mobile } = req.body;
+
+    // Validation
+    if (!email && !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or mobile number",
+      });
+    }
+
+    // Find user by email or mobile
+    const user = await User.findOne({
+      $or: [
+        email && { email },
+        mobile && { mobile },
+      ].filter(Boolean),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    // Set reset token and expiry (valid for 1 hour)
+    user.resetPasswordToken = resetTokenHash;
+    user.resetPasswordExpire = new Date(Date.now() + 60 * 60 * 1000);
+
+    await user.save();
+
+    // Generate reset URL
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // Prepare email content
+    const emailHtml = forgotPasswordTemplate(user.fullName || "User", resetUrl);
+
+    // Send password reset email
+    const emailResult = await sendEmail({
+      to: user.email,
+      subject: "Password Reset Request - Labour Sampark",
+      html: emailHtml,
+      text: `Click here to reset your password: ${resetUrl}`,
+    });
+
+    if (!emailResult.success) {
+      console.error("Failed to send password reset email:", emailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send password reset email. Please try again later.",
+        error: emailResult.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset link has been sent to your email",
+      data: {
+        message: "Please check your email for the password reset link",
+      },
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred during password reset request",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔐 RESET PASSWORD (using token from forgot password)
+// ==========================================
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { resetToken, newPassword, confirmPassword } = req.body;
+
+    // Validation
+    if (!resetToken || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide reset token, new password and confirm password",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    // Hash the reset token to find user
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpire: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully. Please login with your new password",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred during password reset",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔐 CHANGE PASSWORD (for authenticated users)
+// ==========================================
+
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validation for authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    // Validation for required fields
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide current password, new password and confirm password",
+      });
+    }
+
+    // Check if new passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New passwords do not match",
+      });
+    }
+
+    // Validate new password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters long",
+      });
+    }
+
+    // Check if new password is same as current password
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password cannot be same as current password",
+      });
+    }
+
+    // Find user and select password field
+    const user = await User.findById(userId).select("+password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Verify current password
+    const isPasswordCorrect = await user.matchPassword(currentPassword);
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while changing password",
       error: error.message,
     });
   }
