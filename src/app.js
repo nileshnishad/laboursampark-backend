@@ -13,6 +13,7 @@ import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import inquiryRoutes from "./routes/inquiryRoutes.js";
+import jobRoutes from "./routes/jobRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -87,6 +88,15 @@ app.use("/api/inquiries", inquiryRoutes);
 
 // Document Routes
 app.use("/api/documents", documentRoutes);
+
+// Job Routes (all protected)
+// POST /api/jobs - Create job
+// GET /api/jobs - Get jobs with visibility rules
+// GET /api/jobs/:jobId - Get job details
+// PUT/DELETE /api/jobs/:jobId - Update/Delete job
+// POST /api/jobs/:jobId/apply - Apply to job
+// POST /api/jobs/:jobId/select-worker - Select worker
+app.use("/api/jobs", jobRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
