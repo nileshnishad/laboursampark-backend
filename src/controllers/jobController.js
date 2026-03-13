@@ -1,5 +1,7 @@
 import Job from "../models/Job.js";
 import User from "../models/User.js";
+import UserJobHistory from "../models/UserJobHistory.js";
+import { logActivity } from "../utils/activityLogger.js";
 
 // ==========================================
 // 📋 CREATE JOB
@@ -54,6 +56,7 @@ export const createJob = async (req, res) => {
     }
 
     // Validate target values
+    // Users can send: ["labour"] or ["contractor"] or ["sub_contractor"] or ["labour", "contractor"] etc.
     const validTargetValues = ["labour", "contractor", "sub_contractor"];
     const invalidTargets = target.filter(t => !validTargetValues.includes(t));
     
@@ -87,6 +90,42 @@ export const createJob = async (req, res) => {
         success: false,
         message: "Only contractors and sub-contractors can post jobs",
       });
+    }
+
+    // Check job creation limits for contractors and sub-contractors
+    const totalJobsCount = await Job.countDocuments({ createdBy: userId });
+    const activeJobsCount = await Job.countDocuments({
+      createdBy: userId,
+      status: "open",
+      visibility: true,
+    });
+
+    console.log(`📊 Job creation stats for user ${userId}:`);
+    console.log(`   Total jobs: ${totalJobsCount}`);
+    console.log(`   Active jobs: ${activeJobsCount}`);
+
+    // Max 20 total jobs limit
+    if (totalJobsCount >= 20) {
+      return res.status(400).json({
+        success: false,
+        message: "You have reached the maximum limit of 20 jobs. Please close or archive some jobs before creating new ones.",
+        currentJobs: totalJobsCount,
+        maxJobs: 20,
+      });
+    }
+
+    // If 5 active jobs exist, new job will be created with visibility: false
+    let jobVisibility = true;
+    let visibilityMessage = null;
+
+    console.log(`🔍 Checking visibility condition: activeJobsCount (${activeJobsCount}) >= 5?`);
+
+    if (activeJobsCount >= 5) {
+      jobVisibility = false;
+      visibilityMessage = `You have already shown ${activeJobsCount} active jobs. This new job has been created but is inactive. Please deactivate one of your active jobs to make this job visible.`;
+      console.log(`❌ Active limit reached: Setting jobVisibility = false`);
+    } else {
+      console.log(`✅ Within active limit: Setting jobVisibility = true`);
     }
 
     // Create job object
@@ -123,20 +162,50 @@ export const createJob = async (req, res) => {
       createdBy: userId,
       createdByUserType: user.userType,
       status: "open",
+      visibility: jobVisibility, // Use the determined visibility
     };
 
     // Create and save job
     const job = new Job(jobData);
+    console.log(`📝 Before saving - Job visibility: ${job.visibility}`);
     await job.save();
+    console.log(`💾 After saving - Job visibility: ${job.visibility}`);
+
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      "job_created",
+      job._id,
+      "Job",
+      `Job created: ${job.workTitle}`,
+      {
+        jobTitle: job.workTitle,
+        budget: job.estimatedBudget,
+        workersNeeded: job.workersNeeded,
+      },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
 
     // Populate creator details
     await job.populate("createdBy", "fullName email mobile profilePhotoUrl");
 
-    res.status(201).json({
+    const response = {
       success: true,
-      message: "Job created successfully",
+      message: visibilityMessage || "Job created successfully",
       data: job,
-    });
+    };
+
+    // Add warning info if job was created as inactive
+    if (visibilityMessage) {
+      response.warning = {
+        activeJobs: activeJobsCount,
+        maxActiveJobs: 5,
+        jobCreatedAs: "inactive",
+        suggestion: "Go to 'My Jobs' and deactivate one of your active jobs, then activate this job.",
+      };
+    }
+
+    res.status(201).json(response);
   } catch (error) {
     console.error("Create job error:", error);
     res.status(500).json({
@@ -167,7 +236,7 @@ export const getJobs = async (req, res) => {
     }
 
     // Build filter based on user type
-    let filter = { status: status || "open" };
+    let filter = { status: status || "open", visibility: true }; // Only show visible jobs
 
     if (search) {
       filter.$or = [
@@ -187,19 +256,19 @@ export const getJobs = async (req, res) => {
 
     // Visibility Rules
     if (user.userType === "labour") {
-      // Labour can see jobs from both Contractor and Sub-contractor
+      // Labour can see jobs from both Contractor and Sub-contractor (but only visible ones)
       filter.$or = [
-        { target: "labour" },
-        { createdBy: userId }, // Can see own jobs
+        { target: "labour", visibility: true },
+        { createdBy: userId }, // Can see own jobs (both visible and hidden)
       ];
     } else if (user.userType === "contractor") {
-      // Contractor can ONLY see own posted jobs (cannot see sub-contractor or other contractor jobs)
+      // Contractor can only see own posted jobs (visible or hidden)
       filter.createdBy = userId;
     } else if (user.userType === "sub_contractor") {
-      // Sub-contractor can see contractor jobs and own jobs (NOT other sub-contractor jobs)
+      // Sub-contractor can see contractor jobs (visible) and own jobs (both visible and hidden)
       filter.$or = [
-        { target: "sub_contractor", createdByUserType: "contractor" },
-        { createdBy: userId }, // Can see own jobs
+        { target: "sub_contractor", createdByUserType: "contractor", visibility: true },
+        { createdBy: userId }, // Can see own jobs (both visible and hidden)
       ];
     }
 
@@ -423,6 +492,20 @@ export const updateJob = async (req, res) => {
       .populate("createdBy", "fullName email mobile profilePhotoUrl")
       .populate("assignedTo", "fullName email mobile profilePhotoUrl");
 
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      "job_updated",
+      jobId,
+      "Job",
+      `Job updated: ${job.workTitle}`,
+      {
+        jobTitle: job.workTitle,
+        fieldsUpdated: Object.keys(updateData),
+      },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
+
     res.status(200).json({
       success: true,
       message: "Job updated successfully",
@@ -480,6 +563,17 @@ export const deleteJob = async (req, res) => {
     }
 
     await Job.findByIdAndDelete(jobId);
+
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      "job_deleted",
+      jobId,
+      "Job",
+      `Job deleted: ${job.workTitle}`,
+      { jobTitle: job.workTitle },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
 
     res.status(200).json({
       success: true,
@@ -731,6 +825,21 @@ export const selectWorker = async (req, res) => {
 
     await job.save();
 
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      "worker_selected",
+      jobId,
+      "Job",
+      `Worker selected for job: ${job.workTitle}`,
+      {
+        jobTitle: job.workTitle,
+        workerId: workerId,
+        totalWorkers: job.selectedWorkers.length,
+      },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
+
     // Populate and return
     await job.populate(
       "selectedWorkers.workerId",
@@ -785,16 +894,71 @@ export const completeJob = async (req, res) => {
       });
     }
 
-    // Only job creator can mark as complete
-    if (job.createdBy.toString() !== userId) {
+    const isCreator = job.createdBy.toString() === userId;
+    const isSelectedWorker = job.selectedWorkers.some(
+      (worker) => worker.workerId?.toString() === userId
+    );
+
+    // Allow only creator or selected worker to mark completion
+    if (!isCreator && !isSelectedWorker) {
       return res.status(403).json({
         success: false,
-        message: "You can only complete your own jobs",
+        message: "Only job creator or selected worker can mark this job as completed",
       });
     }
 
+    if (job.status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Job is already completed",
+      });
+    }
+
+    // If selected worker is marking complete, record their completion timestamp
+    if (isSelectedWorker) {
+      const workerIndex = job.selectedWorkers.findIndex(
+        (worker) => worker.workerId?.toString() === userId
+      );
+
+      if (workerIndex !== -1 && !job.selectedWorkers[workerIndex].completedAt) {
+        job.selectedWorkers[workerIndex].completedAt = new Date();
+      }
+    }
+
     job.status = "completed";
+    job.completedAt = new Date();
     await job.save();
+
+    // Keep user job history in sync so accepted items move to completed buckets.
+    const completionDate = new Date();
+    await UserJobHistory.updateMany(
+      {
+        jobId: job._id,
+        status: "accepted",
+      },
+      {
+        $set: {
+          status: "completed",
+          isActive: false,
+          "timeline.completedAt": completionDate,
+        },
+      }
+    );
+
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      "job_completed",
+      jobId,
+      "Job",
+      `Job completed: ${job.workTitle}`,
+      {
+        jobTitle: job.workTitle,
+        selectedWorkers: job.selectedWorkers.length,
+        completedBy: isCreator ? "creator" : "worker",
+      },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
 
     await job.populate(
       "selectedWorkers.workerId",
@@ -803,7 +967,7 @@ export const completeJob = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Job marked as completed",
+      message: `Job marked as completed by ${isCreator ? "creator" : "selected worker"}`,
       data: job,
     });
   } catch (error) {
@@ -811,6 +975,113 @@ export const completeJob = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred while completing job",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔄 TOGGLE JOB ACTIVATION (Active/Inactive)
+// ==========================================
+
+export const toggleJobActivation = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { jobId } = req.params;
+
+    // Validation
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    if (!jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid job ID format",
+      });
+    }
+
+    // Find job
+    const job = await Job.findById(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
+    }
+
+    // Check authorization - only job creator can toggle
+    if (job.createdBy.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only toggle activation for your own jobs",
+      });
+    }
+
+    // If trying to activate the job
+    if (!job.visibility) {
+      // Check if user already has 5 active jobs
+      const activeJobsCount = await Job.countDocuments({
+        createdBy: userId,
+        status: "open",
+        visibility: true,
+      });
+
+      if (activeJobsCount >= 5) {
+        return res.status(400).json({
+          success: false,
+          message: `You have already shown ${activeJobsCount} jobs. Maximum 5 active jobs allowed at a time. Please deactivate one of your active jobs to make this job visible.`,
+          activeJobs: activeJobsCount,
+          maxActiveJobs: 5,
+          suggestion: "Go to 'My Jobs' and deactivate one of your active jobs, then try again.",
+        });
+      }
+    }
+
+    // Toggle visibility
+    job.visibility = !job.visibility;
+    await job.save();
+
+    const action = job.visibility ? "activated" : "deactivated";
+
+    // Log activity (non-blocking)
+    logActivity(
+      userId,
+      `job_${action}`,
+      jobId,
+      "Job",
+      `Job ${action}: ${job.workTitle}`,
+      {
+        jobTitle: job.workTitle,
+        isActive: job.visibility,
+      },
+      req
+    ).catch(err => console.error("Activity logging error:", err));
+
+    await job.populate("createdBy", "fullName email mobile profilePhotoUrl");
+
+    res.status(200).json({
+      success: true,
+      message: `Job ${action} successfully`,
+      data: {
+        jobId: job._id,
+        workTitle: job.workTitle,
+        isActive: job.visibility,
+        status: job.status,
+        message: job.visibility
+          ? "Job is now active and visible to applicants"
+          : "Job is now deactivated and hidden from applicants",
+      },
+    });
+  } catch (error) {
+    console.error("Toggle job activation error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while toggling job activation",
       error: error.message,
     });
   }

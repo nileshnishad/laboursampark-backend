@@ -89,6 +89,7 @@ const jobSchema = new mongoose.Schema(
       enum: ["open", "in_progress", "completed", "closed", "cancelled"],
       default: "open",
     },
+    completedAt: Date,
 
     // Created By & Assigned
     createdBy: {

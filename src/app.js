@@ -14,6 +14,11 @@ import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import inquiryRoutes from "./routes/inquiryRoutes.js";
 import jobRoutes from "./routes/jobRoutes.js";
+import jobEnquiryRoutes from "./routes/jobEnquiryRoutes.js";
+import activityHistoryRoutes from "./routes/activityHistoryRoutes.js";
+import userJobHistoryRoutes from "./routes/userJobHistoryRoutes.js";
+import userReviewRoutes from "./routes/userReviewRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -97,6 +102,53 @@ app.use("/api/documents", documentRoutes);
 // POST /api/jobs/:jobId/apply - Apply to job
 // POST /api/jobs/:jobId/select-worker - Select worker
 app.use("/api/jobs", jobRoutes);
+
+// Job Enquiry Routes (all protected)
+// POST /api/job-enquiries/:jobId - Create enquiry
+// GET /api/job-enquiries/job/:jobId - Get enquiries for job (creator only)
+// GET /api/job-enquiries/my/list - Get my enquiries
+// POST /api/job-enquiries/:enquiryId/accept - Accept enquiry
+// POST /api/job-enquiries/:enquiryId/reject - Reject enquiry
+// POST /api/job-enquiries/:enquiryId/withdraw - Withdraw enquiry
+app.use("/api/job-enquiries", jobEnquiryRoutes);
+
+// Activity History Routes (all protected)
+// GET /api/activity-history - Get user activities
+// GET /api/activity-history/summary/overview - Get activity summary
+// GET /api/activity-history/timeline/grouped - Get activity timeline
+// GET /api/activity-history/type/:activityType - Get by type
+// DELETE /api/activity-history/:activityId - Delete activity
+app.use("/api/activity-history", activityHistoryRoutes);
+
+// User Job History Routes (all protected)
+// GET /api/job-history/my/all - Get all job history
+// GET /api/job-history/my/stats - Get job history statistics
+// GET /api/job-history/my/applied - Get applied jobs
+// GET /api/job-history/my/accepted - Get accepted jobs
+// GET /api/job-history/my/rejected - Get rejected jobs
+// GET /api/job-history/my/withdrawn - Get withdrawn jobs
+// GET /api/job-history/my/completed - Get completed jobs
+// GET /api/job-history/contractor/applications - Get applications received (contractor)
+app.use("/api/job-history", userJobHistoryRoutes);
+
+// User Review Routes (all protected)
+// POST /api/user-reviews/submit - Submit review after job completion
+// GET /api/user-reviews/user/:userId - Get all reviews for a user
+// GET /api/user-reviews/job/:jobId - Get all reviews for a job
+// GET /api/user-reviews/rating/:userId - Get detailed rating info
+// GET /api/user-reviews/:reviewId - Get single review
+// POST /api/user-reviews/:reviewId/helpful - Mark review as helpful
+// DELETE /api/user-reviews/:reviewId - Delete review (reviewer only)
+app.use("/api/user-reviews", userReviewRoutes);
+
+// Notification Routes (all protected)
+// GET /api/notifications - Get all notifications for current user
+// GET /api/notifications/unread/count - Get count of unread notifications
+// PUT /api/notifications/:notificationId/read - Mark notification as read
+// PUT /api/notifications/mark/all-read - Mark all as read
+// DELETE /api/notifications/:notificationId - Delete notification
+// DELETE /api/notifications/delete/all - Delete all notifications
+app.use("/api/notifications", notificationRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE

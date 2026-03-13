@@ -10,6 +10,7 @@ import {
   getJobApplications,
   selectWorker,
   completeJob,
+  toggleJobActivation,
 } from "../controllers/jobController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
@@ -58,5 +59,9 @@ router.post("/:jobId/select-worker", authenticateToken, selectWorker);
 // COMPLETE JOB
 // POST /api/jobs/:jobId/complete - Mark job as completed (only by creator)
 router.post("/:jobId/complete", authenticateToken, completeJob);
+
+// TOGGLE JOB ACTIVATION
+// POST /api/jobs/:jobId/toggle-activation - Activate/Deactivate job (only by creator)
+router.post("/:jobId/toggle-activation", authenticateToken, toggleJobActivation);
 
 export default router;
