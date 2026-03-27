@@ -197,6 +197,31 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Payment Summary
+    paymentSummary: {
+      totalTransactions: {
+        type: Number,
+        default: 0,
+      },
+      successfulTransactions: {
+        type: Number,
+        default: 0,
+      },
+      failedTransactions: {
+        type: Number,
+        default: 0,
+      },
+      totalAmountPaid: {
+        type: Number,
+        default: 0,
+      },
+      lastPaymentAt: Date,
+      lastPaymentStatus: {
+        type: String,
+        default: "none",
+      },
+    },
+
     // Verification Details
     aadharVerified: {
       type: Boolean,
