@@ -20,6 +20,7 @@ import userJobHistoryRoutes from "./routes/userJobHistoryRoutes.js";
 import userReviewRoutes from "./routes/userReviewRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import publicRoutes from "./routes/publicRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -78,6 +79,7 @@ app.get("/api/health", (req, res) => {
 // POST /api/users/login - Login user (PUBLIC)
 app.use("/api/users", userRoutes);
 app.use("/auth", userRoutes);
+app.use("/api/public", publicRoutes);
 
 // ==========================================
 // 🔒 PROTECTED & MIXED ROUTES
