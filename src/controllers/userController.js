@@ -52,11 +52,11 @@ export const register = async (req, res) => {
     }
 
     // Validate userType
-    const validUserTypes = ["labour", "contractor","sub_contractor"];
+    const validUserTypes = ["labour", "contractor","sub_contractor","admin","super_admin"];
     if (!validUserTypes.includes(userType.toLowerCase())) {
       return res.status(400).json({
         success: false,
-        message: "userType must be either 'labour', 'contractor' or 'sub_contractor'",
+        message: "userType must be either 'labour', 'contractor', 'sub_contractor', 'admin' or 'super_admin'",
       });
     }
 

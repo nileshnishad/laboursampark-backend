@@ -1,5 +1,13 @@
 
 import Skills from '../models/Skills.js';
+import User from '../models/User.js';
+import Job from '../models/Job.js';
+import UserReview from '../models/UserReview.js';
+import Inquiry from '../models/Inquiry.js';
+import Document from '../models/Document.js';
+import Payment from '../models/Payment.js';
+import Notification from '../models/Notification.js';
+import JobEnquiry from '../models/JobEnquiry.js';
 
 
 export const getSkills = async (req, res) => {
@@ -58,6 +66,41 @@ export const getSkills = async (req, res) => {
   }
 };
 
+export const getAllSkills = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
+    const totalSkills = await Skills.countDocuments({});
+    const totalPages = Math.max(Math.ceil(totalSkills / limit), 1);
+    const skills = await Skills.find({})
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    const formattedSkills = skills.map((skill) => ({
+      ...skill,
+      createdByName: skill.createdBy?.fullName || null,
+      updatedByName: skill.updatedBy?.fullName || null,
+    }));
+
+    res.json({
+      success: true,
+      page,
+      perPage: limit,
+      totalSkills,
+      totalPages,
+      skills: formattedSkills,
+    });
+  } catch (error) {
+    console.error("Error fetching skills:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch skills" });
+  }
+};
 export const addSkills = async (req, res) => {
   try {
     const userId = req.userId;
@@ -91,5 +134,76 @@ export const addSkills = async (req, res) => {
 
     console.error("Error adding skill:", error);
     res.status(500).json({ success: false, message: "Failed to add skill" });
+  }
+};
+
+export const getDashboardStats = async (req, res) => {
+  try {
+    const [
+      totalUsers,
+      totalLabours,
+      totalContractors,
+      totalSubContractors,
+      totalJobs,
+      openJobs,
+      inProgressJobs,
+      completedJobs,
+      totalReviews,
+      totalSkills,
+      totalInquiries,
+      totalDocuments,
+      totalPayments,
+      successfulPayments,
+      totalNotifications,
+      totalJobEnquiries,
+    ] = await Promise.all([
+      User.countDocuments({}),
+      User.countDocuments({ userType: 'labour' }),
+      User.countDocuments({ userType: 'contractor' }),
+      User.countDocuments({ userType: 'sub_contractor' }),
+      Job.countDocuments({}),
+      Job.countDocuments({ status: 'open' }),
+      Job.countDocuments({ status: 'in_progress' }),
+      Job.countDocuments({ status: 'completed' }),
+      UserReview.countDocuments({}),
+      Skills.countDocuments({}),
+      Inquiry.countDocuments({}),
+      Document.countDocuments({}),
+      Payment.countDocuments({}),
+      Payment.countDocuments({ status: 'success' }),
+      Notification.countDocuments({}),
+      JobEnquiry.countDocuments({}),
+    ]);
+
+    return res.json({
+      success: true,
+      stats: {
+        users: {
+          total: totalUsers,
+          labour: totalLabours,
+          contractor: totalContractors,
+          subContractor: totalSubContractors,
+        },
+        jobs: {
+          total: totalJobs,
+          open: openJobs,
+          inProgress: inProgressJobs,
+          completed: completedJobs,
+        },
+        reviews: totalReviews,
+        skills: totalSkills,
+        inquiries: totalInquiries,
+        documents: totalDocuments,
+        payments: {
+          total: totalPayments,
+          successful: successfulPayments,
+        },
+        notifications: totalNotifications,
+        jobEnquiries: totalJobEnquiries,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch dashboard stats' });
   }
 };
