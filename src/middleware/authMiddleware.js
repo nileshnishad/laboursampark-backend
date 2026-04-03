@@ -187,7 +187,7 @@ export const isAdmin = (req, res, next) => {
 
   // You can add admin check logic here
   // For now, assuming certain userTypes are admins
-  const adminTypes = ["admin", "superadmin"];
+  const adminTypes = ["admin", "super_admin"];
 
   if (!adminTypes.includes(req.user.userType)) {
     return res.status(403).json({
