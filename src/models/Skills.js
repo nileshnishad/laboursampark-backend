@@ -2,6 +2,22 @@ import mongoose from "mongoose";
 
 const skillSchema = new mongoose.Schema(
   {
+    enName: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    hiName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    mrName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     name: {
       type: String,
       required: true,
