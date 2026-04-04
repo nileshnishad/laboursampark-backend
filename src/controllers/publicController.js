@@ -28,28 +28,36 @@ export const getSkills = async (req, res) => {
 
     const selectedLang = langMap[requestedFlag] || 'en';
 
-    const languageFilter =
-      selectedLang === 'en'
-        ? {
-            $or: [
-              { lang: 'en' },
-              { lang: { $exists: false } },
-              { lang: { $size: 0 } },
-            ],
-          }
-        : { lang: selectedLang };
+    const nameFieldByLang = {
+      en: 'enName',
+      hi: 'hiName',
+      mr: 'mrName',
+    };
 
-    const totalSkills = await Skills.countDocuments(languageFilter);
+    const selectedNameField = nameFieldByLang[selectedLang] || 'enName';
+
+    const totalSkills = await Skills.countDocuments({});
     const totalPages = Math.max(Math.ceil(totalSkills / limit), 1);
     const skip = (page - 1) * limit;
 
-    const skills = await Skills.find(languageFilter, { _id: 0, name: 1 })
-      .sort({ name: 1 })
+    const skills = await Skills.find({}, { _id: 0, enName: 1, hiName: 1, mrName: 1, name: 1 })
+      .sort({ enName: 1, name: 1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const listedSkills = skills.map((skill) => skill.name);
+    const listedSkills = skills
+      .map((skill) => {
+        const selectedName = (skill[selectedNameField] || '').trim();
+        const fallbackName =
+          (skill.enName || '').trim() ||
+          (skill.name || '').trim() ||
+          (skill.hiName || '').trim() ||
+          (skill.mrName || '').trim();
+
+        return selectedName || fallbackName;
+      })
+      .filter(Boolean);
 
     res.json({
       success: true,
@@ -75,7 +83,7 @@ export const getAllSkills = async (req, res) => {
     const totalSkills = await Skills.countDocuments({});
     const totalPages = Math.max(Math.ceil(totalSkills / limit), 1);
     const skills = await Skills.find({})
-      .sort({ name: 1 })
+      .sort({ enName: 1, name: 1 })
       .skip(skip)
       .limit(limit)
       .populate('createdBy', 'fullName')
@@ -104,23 +112,28 @@ export const getAllSkills = async (req, res) => {
 export const addSkills = async (req, res) => {
   try {
     const userId = req.userId;
-    const { name, description, category, lang } = req.body;
+    const { name, enName, hiName, mrName, description, category } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
 
-    if (!name || !lang) {
-      return res.status(400).json({ success: false, message: "Name and language are required" });
+    const normalizedEnName = String(enName || name || '').trim();
+    const normalizedHiName = String(hiName || '').trim();
+    const normalizedMrName = String(mrName || '').trim();
+
+    if (!normalizedEnName) {
+      return res.status(400).json({ success: false, message: 'enName is required' });
     }
 
-    const normalizedLang = Array.isArray(lang) ? lang : [lang];
-
     const newSkill = new Skills({
-      name,
+      enName: normalizedEnName,
+      hiName: normalizedHiName,
+      mrName: normalizedMrName,
+      name: normalizedEnName,
       description,
       category,
-      lang: normalizedLang,
+      lang: ['hi', 'en', 'mr'],
       createdBy: userId,
       updatedBy: userId,
     });
