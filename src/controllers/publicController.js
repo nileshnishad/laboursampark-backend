@@ -150,6 +150,89 @@ export const addSkills = async (req, res) => {
   }
 };
 
+export const updateSkill = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { skillId } = req.params;
+    const { name, enName, hiName, mrName, description, category } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!skillId) {
+      return res.status(400).json({ success: false, message: 'skillId is required' });
+    }
+
+    const existingSkill = await Skills.findById(skillId);
+
+    if (!existingSkill) {
+      return res.status(404).json({ success: false, message: 'Skill not found' });
+    }
+
+    const normalizedEnName =
+      enName !== undefined
+        ? String(enName || '').trim()
+        : name !== undefined
+          ? String(name || '').trim()
+          : undefined;
+
+    if (normalizedEnName !== undefined && !normalizedEnName) {
+      return res.status(400).json({ success: false, message: 'enName cannot be empty' });
+    }
+
+    const updatePayload = {
+      updatedBy: userId,
+    };
+
+    if (normalizedEnName !== undefined) {
+      updatePayload.enName = normalizedEnName;
+      updatePayload.name = normalizedEnName;
+    }
+
+    if (hiName !== undefined) {
+      updatePayload.hiName = String(hiName || '').trim();
+    }
+
+    if (mrName !== undefined) {
+      updatePayload.mrName = String(mrName || '').trim();
+    }
+
+    if (description !== undefined) {
+      updatePayload.description = String(description || '').trim();
+    }
+
+    if (category !== undefined) {
+      updatePayload.category = String(category || '').trim();
+    }
+
+    const updatedSkill = await Skills.findByIdAndUpdate(skillId, updatePayload, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    return res.json({
+      success: true,
+      message: 'Skill updated successfully',
+      skill: {
+        ...updatedSkill,
+        createdByName: updatedSkill.createdBy?.fullName || null,
+        updatedByName: updatedSkill.updatedBy?.fullName || null,
+      },
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Skill already exists' });
+    }
+
+    console.error('Error updating skill:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update skill' });
+  }
+};
+
 export const getDashboardStats = async (req, res) => {
   try {
     const [
