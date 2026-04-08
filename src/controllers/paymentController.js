@@ -147,6 +147,31 @@ const updatePaymentSummary = async ({ userId, oldStatus, newStatus, amount }) =>
   await User.updateOne({ _id: userId }, update);
 };
 
+const applyPostPaymentBenefits = async (payment) => {
+  if (!payment?.userId) return null;
+  if (payment?.benefitAppliedAt) return payment.benefitAppliedDetails || {};
+
+  const purpose = String(payment.purpose || "").toLowerCase();
+  const benefitType = String(payment.metadata?.benefitType || "").toLowerCase();
+  const updates = {};
+
+  // Profile visibility unlock use-case.
+  if (
+    purpose.includes("visibility") ||
+    benefitType === "profile_visibility" ||
+    payment.metadata?.setDisplayTrue === true
+  ) {
+    updates.display = true;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return null;
+  }
+
+  await User.updateOne({ _id: payment.userId }, { $set: updates });
+  return updates;
+};
+
 const verifyWithPayU = async ({ key, salt, commandUrl, txnId }) => {
   const command = "verify_payment";
   const hash = sha512(`${key}|${command}|${txnId}|${salt}`);
@@ -459,6 +484,8 @@ const handlePayUCallback = async ({ req, res, forcedStatus }) => {
   payment.payuStatus = status;
   payment.payuResponse = body;
 
+  let appliedBenefits = null;
+
   if (status === "success") {
     let verifyResult = null;
     try {
@@ -477,6 +504,11 @@ const handlePayUCallback = async ({ req, res, forcedStatus }) => {
       payment.status = "success";
       payment.paidAt = new Date();
       payment.errorDetails = undefined;
+      appliedBenefits = await applyPostPaymentBenefits(payment);
+      if (appliedBenefits) {
+        payment.benefitAppliedAt = new Date();
+        payment.benefitAppliedDetails = appliedBenefits;
+      }
     } else {
       payment.status = "failed";
       payment.errorDetails = {
@@ -529,6 +561,8 @@ const handlePayUCallback = async ({ req, res, forcedStatus }) => {
       status: payment.status,
       amount: payment.amount,
       paidAt: payment.paidAt,
+      benefitApplied: Boolean(payment.benefitAppliedAt),
+      benefitAppliedDetails: payment.benefitAppliedDetails || null,
     },
   });
 };
@@ -575,6 +609,8 @@ export const getPaymentStatus = async (req, res) => {
         gateway: payment.gateway,
         paidAt: payment.paidAt,
         createdAt: payment.createdAt,
+        benefitApplied: Boolean(payment.benefitAppliedAt),
+        benefitAppliedDetails: payment.benefitAppliedDetails || null,
       },
     });
   } catch (error) {

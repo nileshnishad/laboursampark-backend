@@ -112,6 +112,11 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    benefitAppliedAt: Date,
+    benefitAppliedDetails: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     errorDetails: {
       code: String,
       description: String,
