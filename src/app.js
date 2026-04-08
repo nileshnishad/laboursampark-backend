@@ -19,7 +19,6 @@ import activityHistoryRoutes from "./routes/activityHistoryRoutes.js";
 import userJobHistoryRoutes from "./routes/userJobHistoryRoutes.js";
 import userReviewRoutes from "./routes/userReviewRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 
 // ==========================================
@@ -152,14 +151,6 @@ app.use("/api/user-reviews", userReviewRoutes);
 // DELETE /api/notifications/:notificationId - Delete notification
 // DELETE /api/notifications/delete/all - Delete all notifications
 app.use("/api/notifications", notificationRoutes);
-
-// Payment Routes (all protected)
-// POST /api/payments/checkout - Create Razorpay order and return checkout payload
-// POST /api/payments/verify - Verify payment signature and mark success
-// POST /api/payments/failure - Save failed/cancelled/expired payment outcome
-// GET /api/payments/history - Get user payment history
-// GET /api/payments/history/:paymentId - Get one payment record
-app.use("/api/payments", paymentRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
