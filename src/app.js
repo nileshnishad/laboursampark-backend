@@ -19,6 +19,7 @@ import activityHistoryRoutes from "./routes/activityHistoryRoutes.js";
 import userJobHistoryRoutes from "./routes/userJobHistoryRoutes.js";
 import userReviewRoutes from "./routes/userReviewRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 
 // ==========================================
@@ -151,6 +152,15 @@ app.use("/api/user-reviews", userReviewRoutes);
 // DELETE /api/notifications/:notificationId - Delete notification
 // DELETE /api/notifications/delete/all - Delete all notifications
 app.use("/api/notifications", notificationRoutes);
+
+// Payment Routes (PayU)
+// POST /api/payments/payu/create-link - Create secure backend-owned payment link
+// GET /api/payments/checkout/:token - Redirects user to PayU hosted checkout
+// POST /api/payments/payu/callback/success - PayU success callback
+// POST /api/payments/payu/callback/failure - PayU failure callback
+// GET /api/payments/:paymentId/status - Get payment status for logged-in user
+// GET /api/payments/history - Get user payment history
+app.use("/api/payments", paymentRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
