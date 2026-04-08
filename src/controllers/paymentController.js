@@ -153,12 +153,17 @@ const applyPostPaymentBenefits = async (payment) => {
 
   const purpose = String(payment.purpose || "").toLowerCase();
   const benefitType = String(payment.metadata?.benefitType || "").toLowerCase();
+  const productInfo = String(payment.productInfo || "").toLowerCase();
+  const description = String(payment.description || "").toLowerCase();
   const updates = {};
 
   // Profile visibility unlock use-case.
   if (
     purpose.includes("visibility") ||
+    productInfo.includes("visibility") ||
+    description.includes("visibility") ||
     benefitType === "profile_visibility" ||
+    benefitType === "visibility" ||
     payment.metadata?.setDisplayTrue === true
   ) {
     updates.display = true;
@@ -594,9 +599,19 @@ export const getPaymentStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid paymentId format" });
     }
 
-    const payment = await Payment.findOne({ _id: paymentId, userId }).lean();
+    const payment = await Payment.findOne({ _id: paymentId, userId });
     if (!payment) {
       return res.status(404).json({ success: false, message: "Payment not found" });
+    }
+
+    // Self-heal for old successful records where benefit was not applied.
+    if (payment.status === "success" && !payment.benefitAppliedAt) {
+      const appliedBenefits = await applyPostPaymentBenefits(payment);
+      if (appliedBenefits) {
+        payment.benefitAppliedAt = new Date();
+        payment.benefitAppliedDetails = appliedBenefits;
+        await payment.save();
+      }
     }
 
     return res.json({
