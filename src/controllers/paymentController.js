@@ -3,6 +3,7 @@ import Payment from "../models/Payment.js";
 import User from "../models/User.js";
 
 const DEFAULT_CHECKOUT_TTL_MINUTES = 20;
+const DEFAULT_VISIBILITY_DAYS = Number(process.env.PAYMENT_VISIBILITY_DAYS || 90);
 
 const getPayUConfig = () => {
   const key = process.env.PAYU_KEY;
@@ -156,6 +157,9 @@ const applyPostPaymentBenefits = async (payment) => {
   const productInfo = String(payment.productInfo || "").toLowerCase();
   const description = String(payment.description || "").toLowerCase();
   const updates = {};
+  const visibilityDays = Number(
+    payment.metadata?.visibilityDays || payment.metadata?.validityDays || DEFAULT_VISIBILITY_DAYS,
+  );
 
   // Profile visibility unlock use-case.
   if (
@@ -166,7 +170,15 @@ const applyPostPaymentBenefits = async (payment) => {
     benefitType === "visibility" ||
     payment.metadata?.setDisplayTrue === true
   ) {
+    const now = new Date();
+    const user = await User.findById(payment.userId).select("displayActivatedAt displayExpiresAt").lean();
+    const activeUntil = user?.displayExpiresAt ? new Date(user.displayExpiresAt) : null;
+    const baseDate = activeUntil && activeUntil > now ? activeUntil : now;
+    const displayExpiresAt = new Date(baseDate.getTime() + visibilityDays * 24 * 60 * 60 * 1000);
+
     updates.display = true;
+    updates.displayActivatedAt = user?.displayActivatedAt || now;
+    updates.displayExpiresAt = displayExpiresAt;
   }
 
   if (Object.keys(updates).length === 0) {

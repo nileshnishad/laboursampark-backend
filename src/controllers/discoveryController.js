@@ -8,6 +8,7 @@ export const getVisibleUsers = async (req, res) => {
   try {
     const userId = req.userId;
     const { page = 1, limit = 20, skills, location, rating, minRate, maxRate } = req.query;
+    const now = new Date();
 
     console.log("Getting visible users for userId:", userId);
 
@@ -35,6 +36,7 @@ export const getVisibleUsers = async (req, res) => {
     const filter = {
       userType: targetUserType,
       display: true,
+      $or: [{ displayExpiresAt: { $exists: false } }, { displayExpiresAt: null }, { displayExpiresAt: { $gte: now } }],
       _id: { $ne: userId }, // Exclude self
     };
 
@@ -157,6 +159,7 @@ export const getVisibleUsers = async (req, res) => {
 export const getLabours = async (req, res) => {
   try {
     const { page = 1, limit = 20, skills, location, rating, minRate, maxRate } = req.query;
+    const now = new Date();
 
     console.log("Fetching labour users...");
 
@@ -164,6 +167,7 @@ export const getLabours = async (req, res) => {
     const filter = {
       userType: "labour",
       display: true,
+      $or: [{ displayExpiresAt: { $exists: false } }, { displayExpiresAt: null }, { displayExpiresAt: { $gte: now } }],
     };
 
     // Optional filters
@@ -268,6 +272,7 @@ export const getLabours = async (req, res) => {
 export const getContractors = async (req, res) => {
   try {
     const { page = 1, limit = 20, skills, location, rating, minRate, maxRate } = req.query;
+    const now = new Date();
 
     console.log("Fetching contractor users...");
 
@@ -275,6 +280,7 @@ export const getContractors = async (req, res) => {
     const filter = {
       userType: ["contractor","sub_contractor"], // Show both contractors and sub-contractors
       display: true,
+      $or: [{ displayExpiresAt: { $exists: false } }, { displayExpiresAt: null }, { displayExpiresAt: { $gte: now } }],
     };
 
     // Optional filters

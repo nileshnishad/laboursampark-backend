@@ -64,6 +64,8 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    displayActivatedAt: Date,
+    displayExpiresAt: Date,
     isVerified: {
       type: Boolean,
       default: false,
