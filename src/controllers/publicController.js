@@ -5,7 +5,6 @@ import Job from '../models/Job.js';
 import UserReview from '../models/UserReview.js';
 import Inquiry from '../models/Inquiry.js';
 import Document from '../models/Document.js';
-import Payment from '../models/Payment.js';
 import Notification from '../models/Notification.js';
 import JobEnquiry from '../models/JobEnquiry.js';
 
@@ -248,8 +247,6 @@ export const getDashboardStats = async (req, res) => {
       totalSkills,
       totalInquiries,
       totalDocuments,
-      totalPayments,
-      successfulPayments,
       totalNotifications,
       totalJobEnquiries,
     ] = await Promise.all([
@@ -265,8 +262,6 @@ export const getDashboardStats = async (req, res) => {
       Skills.countDocuments({}),
       Inquiry.countDocuments({}),
       Document.countDocuments({}),
-      Payment.countDocuments({}),
-      Payment.countDocuments({ status: 'success' }),
       Notification.countDocuments({}),
       JobEnquiry.countDocuments({}),
     ]);
@@ -290,10 +285,6 @@ export const getDashboardStats = async (req, res) => {
         skills: totalSkills,
         inquiries: totalInquiries,
         documents: totalDocuments,
-        payments: {
-          total: totalPayments,
-          successful: successfulPayments,
-        },
         notifications: totalNotifications,
         jobEnquiries: totalJobEnquiries,
       },
