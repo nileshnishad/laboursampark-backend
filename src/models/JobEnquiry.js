@@ -53,12 +53,13 @@ const jobEnquirySchema = new mongoose.Schema(
     // Status Management
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "withdrawn"],
+      enum: ["pending", "accepted", "rejected", "withdrawn", "completed"],
       default: "pending",
     },
     acceptedAt: Date,
     rejectedAt: Date,
     rejectionReason: String,
+    completedAt: Date,
 
     // Communication
     notes: String, // Notes from job poster about this enquiry

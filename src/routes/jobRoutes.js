@@ -11,7 +11,10 @@ import {
   selectWorker,
   completeJob,
   toggleJobActivation,
+  getApplicationsForJob,
+  getAllJobsForApplicant,
 } from "../controllers/jobController.js";
+import { getJobStats } from "../controllers/jobStatsController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -21,8 +24,8 @@ const router = express.Router();
 // ==========================================
 
 // CREATE JOB
-// POST /api/jobs - Create a new job (Contractor/Sub-contractor only)
-router.post("/create", authenticateToken, createJob);
+// POST /api/jobs/create-job - Create a new job (Contractor/Sub-contractor only)
+router.post("/create-job", authenticateToken, createJob);
 
 // GET ALL JOBS
 // GET /api/jobs - Get jobs based on visibility rules
@@ -32,7 +35,19 @@ router.get("/", authenticateToken, getJobs);
 // GET /api/jobs/my-jobs - Get jobs posted by current user
 router.get("/my-jobs", authenticateToken, getMyJobs);
 
-// GET JOB BY ID
+// GET JOB STATS — returns different stats based on logged-in user's userType
+// GET /api/jobs/stats
+router.get("/stats", authenticateToken, getJobStats);
+
+// GET APPLICATIONS FOR A JOB (job creator only)
+// GET /api/jobs/getApplication?jobId=xxx&status=pending&page=1&limit=20
+router.get("/getApplication", authenticateToken, getApplicationsForJob);
+
+// GET ALL JOBS FEED (labour & sub_contractor only)
+// GET /api/jobs/all?search=&skills=Mason&city=Mumbai&budgetMin=1000&budgetMax=50000&budgetType=fixed&sort=newest&page=1&limit=10
+router.get("/all", authenticateToken, getAllJobsForApplicant);
+
+// GET JOB BY ID  (⚠️ wildcard — must stay AFTER all fixed-path GET routes)
 // GET /api/jobs/:jobId - Get specific job details
 router.get("/:jobId", authenticateToken, getJobById);
 

@@ -66,6 +66,12 @@ const jobSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Job Images (site photos, work reference images)
+    images: {
+      type: [String], // Array of image URLs (supports single or multiple)
+      default: [],
+    },
+
     // Pricing & Timeline
     estimatedBudget: {
       type: Number,
