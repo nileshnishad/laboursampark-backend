@@ -1,4 +1,5 @@
 import Job from "../models/Job.js";
+import JobEnquiry from "../models/JobEnquiry.js";
 import User from "../models/User.js";
 import UserJobHistory from "../models/UserJobHistory.js";
 import { logActivity } from "../utils/activityLogger.js";
@@ -27,6 +28,7 @@ export const createJob = async (req, res) => {
       requiredSkills,
       requiredDetails,
       supportDocuments,
+      images,
       estimatedBudget,
       budgetType,
       deadline,
@@ -150,6 +152,7 @@ export const createJob = async (req, res) => {
       requiredSkills: requiredSkills || [],
       requiredDetails: requiredDetails || "",
       supportDocuments: supportDocuments || [],
+      images: Array.isArray(images) ? images : images ? [images] : [],
       estimatedBudget: estimatedBudget ? parseInt(estimatedBudget) : null,
       budgetType: budgetType || "fixed",
       deadline: deadline ? new Date(deadline) : null,
@@ -187,7 +190,7 @@ export const createJob = async (req, res) => {
     ).catch(err => console.error("Activity logging error:", err));
 
     // Populate creator details
-    await job.populate("createdBy", "fullName email mobile profilePhotoUrl");
+    await job.populate("createdBy", "fullName email mobile profilePhotoUrl userType companyName rating completedJobs location");
 
     const response = {
       success: true,
@@ -1082,6 +1085,364 @@ export const toggleJobActivation = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred while toggling job activation",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 📋 GET APPLICATIONS FOR A JOB
+// GET /api/jobs/getApplication?jobId=xxx  (or /api/jobs/:jobId/getApplication)
+// Only the job creator can access this.
+// Returns total count + full applicant details.
+// ==========================================
+
+export const getApplicationsForJob = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Accept jobId from query param or route param
+    const jobId = req.query.jobId || req.params.jobId;
+
+    if (!jobId) {
+      return res.status(400).json({
+        success: false,
+        message: "jobId is required. Pass it as a query param: ?jobId=<id>",
+      });
+    }
+
+    if (!jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid jobId format",
+      });
+    }
+
+    // Fetch the job
+    const job = await Job.findById(jobId).select(
+      "workTitle description status createdBy workersNeeded estimatedBudget budgetType location requiredSkills images target createdAt"
+    );
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
+    }
+
+    // Only the job creator can view applications
+    if (job.createdBy.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only view applications for jobs you posted.",
+      });
+    }
+
+    // Pagination
+    const page  = parseInt(req.query.page)  || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip  = (page - 1) * limit;
+
+    // Optional filter by status
+    const enquiryFilter = { jobId };
+    if (req.query.status) {
+      enquiryFilter.status = req.query.status; // pending | accepted | rejected | withdrawn
+    }
+
+    const [applications, totalCount] = await Promise.all([
+      JobEnquiry.find(enquiryFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate(
+          "userId",
+          "fullName email mobile profilePhotoUrl rating totalReviews skills experience userType location availability completedJobs"
+        ),
+      JobEnquiry.countDocuments(enquiryFilter),
+    ]);
+
+    // Count breakdown by status
+    const [pending, accepted, rejected, withdrawn] = await Promise.all([
+      JobEnquiry.countDocuments({ jobId, status: "pending" }),
+      JobEnquiry.countDocuments({ jobId, status: "accepted" }),
+      JobEnquiry.countDocuments({ jobId, status: "rejected" }),
+      JobEnquiry.countDocuments({ jobId, status: "withdrawn" }),
+    ]);
+
+    // Shape each application for clean response
+    const applicationList = applications.map((enq) => ({
+      enquiryId:       enq._id,
+      status:          enq.status,
+      message:         enq.message,
+      appliedAt:       enq.createdAt,
+      acceptedAt:      enq.acceptedAt  || null,
+      rejectedAt:      enq.rejectedAt  || null,
+      rejectionReason: enq.rejectionReason || null,
+      notes:           enq.notes || null,
+      applicant: enq.userId
+        ? {
+            userId:        enq.userId._id,
+            name:          enq.userId.fullName,
+            email:         enq.userId.email,
+            mobile:        enq.userId.mobile,
+            profilePhoto:  enq.userId.profilePhotoUrl || null,
+            userType:      enq.userId.userType,
+            rating:        enq.userId.rating,
+            totalReviews:  enq.userId.totalReviews,
+            skills:        enq.userId.skills || [],
+            experience:    enq.userId.experience || null,
+            completedJobs: enq.userId.completedJobs,
+            availability:  enq.userId.availability,
+            location: enq.userId.location
+              ? {
+                  city:  enq.userId.location.city,
+                  state: enq.userId.location.state,
+                  area:  enq.userId.location.area,
+                }
+              : null,
+          }
+        : enq.userDetails, // fallback to snapshot if user deleted
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Applications fetched successfully",
+      data: {
+        job: {
+          jobId:           job._id,
+          workTitle:       job.workTitle,
+          status:          job.status,
+          workersNeeded:   job.workersNeeded,
+          estimatedBudget: job.estimatedBudget,
+          budgetType:      job.budgetType,
+          requiredSkills:  job.requiredSkills,
+          images:          job.images || [],
+          location:        job.location,
+          target:          job.target,
+          postedAt:        job.createdAt,
+        },
+        summary: {
+          total:     totalCount,
+          pending,
+          accepted,
+          rejected,
+          withdrawn,
+        },
+        pagination: {
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+        applications: applicationList,
+      },
+    });
+  } catch (error) {
+    console.error("getApplicationsForJob error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch applications",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 📋 GET ALL JOBS FOR APPLICANTS
+// GET /api/jobs/all
+// Only for: labour, sub_contractor
+// Shows jobs where target[] includes the caller's userType.
+// Each job includes: have I already applied? (myApplication)
+// Filters: search, skills, location, city, state, budgetMin, budgetMax,
+//          budgetType, sort (newest|oldest|budget_high|budget_low)
+// ==========================================
+
+export const getAllJobsForApplicant = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const user = await User.findById(userId).select("userType");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Only labour and sub_contractor can use this feed
+    if (!["labour", "sub_contractor"].includes(user.userType)) {
+      return res.status(403).json({
+        success: false,
+        message: "This feed is only available for labour and sub-contractor accounts",
+      });
+    }
+
+    const {
+      search,
+      skills,
+      city,
+      state,
+      location,
+      budgetMin,
+      budgetMax,
+      budgetType,
+      sort = "newest",
+      page  = 1,
+      limit = 10,
+    } = req.query;
+
+    // --- Base filter: open, visible, target includes caller's userType ---
+    const filter = {
+      status: "open",
+      visibility: true,
+      target: user.userType,          // job.target is an array — $elemMatch not needed; Mongoose does it
+      createdBy: { $ne: userId },     // cannot apply to own job
+    };
+
+    // --- Search on title or description ---
+    if (search) {
+      filter.$or = [
+        { workTitle:    { $regex: search, $options: "i" } },
+        { description:  { $regex: search, $options: "i" } },
+        { requiredDetails: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // --- Skills filter (match any) ---
+    if (skills) {
+      const skillsArr = Array.isArray(skills) ? skills : skills.split(",").map((s) => s.trim());
+      filter.requiredSkills = { $in: skillsArr };
+    }
+
+    // --- Location filter ---
+    if (city)     filter["location.city"]  = { $regex: city,  $options: "i" };
+    if (state)    filter["location.state"] = { $regex: state, $options: "i" };
+    if (location) filter["location.city"]  = { $regex: location, $options: "i" }; // fallback alias
+
+    // --- Budget filter ---
+    if (budgetMin || budgetMax) {
+      filter.estimatedBudget = {};
+      if (budgetMin) filter.estimatedBudget.$gte = Number(budgetMin);
+      if (budgetMax) filter.estimatedBudget.$lte = Number(budgetMax);
+    }
+    if (budgetType) filter.budgetType = budgetType; // fixed | hourly | daily
+
+    // --- Sort ---
+    const sortMap = {
+      newest:      { createdAt: -1 },
+      oldest:      { createdAt:  1 },
+      budget_high: { estimatedBudget: -1 },
+      budget_low:  { estimatedBudget:  1 },
+    };
+    const sortOption = sortMap[sort] || sortMap.newest;
+
+    // --- Pagination ---
+    const parsedPage  = Math.max(1, parseInt(page));
+    const parsedLimit = Math.min(50, Math.max(1, parseInt(limit)));
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    // --- Fetch jobs + total count in parallel ---
+    const [jobs, total] = await Promise.all([
+      Job.find(filter)
+        .populate(
+          "createdBy",
+          "fullName email mobile profilePhotoUrl userType companyName rating completedJobs location"
+        )
+        .sort(sortOption)
+        .skip(skip)
+        .limit(parsedLimit)
+        .lean(),
+      Job.countDocuments(filter),
+    ]);
+
+    if (jobs.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No jobs found matching your criteria",
+        data: { jobs: [], pagination: { total: 0, page: parsedPage, limit: parsedLimit, totalPages: 0 } },
+      });
+    }
+
+    // --- Fetch caller's existing enquiries for these job IDs in one query ---
+    const jobIds = jobs.map((j) => j._id);
+    const myEnquiries = await JobEnquiry.find({
+      userId,
+      jobId: { $in: jobIds },
+    }).select("jobId status createdAt").lean();
+
+    const enquiryMap = new Map(
+      myEnquiries.map((e) => [e.jobId.toString(), { status: e.status, appliedAt: e.createdAt }])
+    );
+
+    // --- Shape response ---
+    const jobList = jobs.map((job) => {
+      const myApplication = enquiryMap.get(job._id.toString()) || null;
+      return {
+        jobId:           job._id,
+        workTitle:       job.workTitle,
+        description:     job.description,
+        workType:        job.workType,
+        category:        job.category,
+        priority:        job.priority,
+        requiredSkills:  job.requiredSkills,
+        requiredDetails: job.requiredDetails,
+        workersNeeded:   job.workersNeeded,
+        estimatedBudget: job.estimatedBudget,
+        budgetType:      job.budgetType,
+        deadline:        job.deadline,
+        expectedStartDate: job.expectedStartDate,
+        duration:        job.duration,
+        images:          job.images || [],
+        location: {
+          city:    job.location?.city,
+          state:   job.location?.state,
+          area:    job.location?.area,
+          pincode: job.location?.pincode,
+          address: job.location?.address,
+        },
+        totalApplications: job.totalApplications,
+        status:           job.status,
+        postedAt:         job.createdAt,
+
+        // How this user relates to this job
+        myApplication: myApplication
+          ? { applied: true,  status: myApplication.status, appliedAt: myApplication.appliedAt }
+          : { applied: false, status: null,                   appliedAt: null },
+
+        // Creator info
+        postedBy: job.createdBy
+          ? {
+              userId:       job.createdBy._id,
+              name:         job.createdBy.fullName,
+              companyName:  job.createdBy.companyName || null,
+              profilePhoto: job.createdBy.profilePhotoUrl || null,
+              userType:     job.createdBy.userType,
+              rating:       job.createdBy.rating,
+              completedJobs: job.createdBy.completedJobs,
+              location: job.createdBy.location
+                ? { city: job.createdBy.location.city, state: job.createdBy.location.state }
+                : null,
+            }
+          : null,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Jobs fetched successfully",
+      data: {
+        userType: user.userType,
+        filters: { search, skills, city, state, budgetMin, budgetMax, budgetType, sort },
+        pagination: {
+          total,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+        jobs: jobList,
+      },
+    });
+  } catch (error) {
+    console.error("getAllJobsForApplicant error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch jobs",
       error: error.message,
     });
   }

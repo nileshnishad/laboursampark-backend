@@ -3,6 +3,7 @@ import Job from "../models/Job.js";
 import User from "../models/User.js";
 import UserJobHistory from "../models/UserJobHistory.js";
 import Notification from "../models/Notification.js";
+import UserReview from "../models/UserReview.js";
 import { logActivity } from "../utils/activityLogger.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { jobRejectionTemplate } from "../utils/templates/jobRejectionTemplate.js";
@@ -995,6 +996,356 @@ export const addNotesToEnquiry = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred while adding notes",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔗 CONNECT APPLICATION (pending → accepted)
+// POST /api/job-enquiries/:enquiryId/connect
+// Job creator calls this to connect/hire the applicant.
+// Same effect as acceptEnquiry with clean route naming.
+// ==========================================
+
+export const connectApplication = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { enquiryId } = req.params;
+
+    if (!enquiryId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: "Invalid enquiry ID format" });
+    }
+
+    const enquiry = await JobEnquiry.findById(enquiryId)
+      .populate("jobId")
+      .populate("userId")
+      .populate("postedBy");
+
+    if (!enquiry) {
+      return res.status(404).json({ success: false, message: "Application not found" });
+    }
+
+    // Only the job creator can connect
+    if (enquiry.postedBy._id.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the job owner can connect with an applicant",
+      });
+    }
+
+    // Must be pending
+    if (enquiry.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot connect — application is already "${enquiry.status}"`,
+        currentStatus: enquiry.status,
+      });
+    }
+
+    const jobTitle = enquiry.jobId?.workTitle || "Unknown Job";
+    const now = new Date();
+
+    // Update enquiry
+    enquiry.status = "accepted";
+    enquiry.acceptedAt = now;
+    await enquiry.save();
+
+    // Update UserJobHistory
+    await UserJobHistory.findOneAndUpdate(
+      { enquiryId },
+      { status: "accepted", "timeline.acceptedAt": now, isActive: true },
+      { new: true }
+    );
+
+    // Add to job.selectedWorkers (if not already)
+    const job = enquiry.jobId;
+    const alreadySelected = job.selectedWorkers?.some(
+      (w) => w.workerId.toString() === enquiry.userId._id.toString()
+    );
+    if (!alreadySelected) {
+      await Job.findByIdAndUpdate(job._id, {
+        $push: { selectedWorkers: { workerId: enquiry.userId._id, acceptedAt: now } },
+      });
+    }
+
+    // In-app notification (non-blocking)
+    new Notification({
+      userId: enquiry.userId._id,
+      notificationType: "enquiry_accepted",
+      enquiryId: enquiry._id,
+      jobId: job._id,
+      relatedUserId: enquiry.postedBy._id,
+      title: `You're connected! — ${jobTitle}`,
+      message: `${enquiry.postedBy.fullName} has accepted your application for "${jobTitle}". They will contact you soon.`,
+      details: {
+        jobTitle,
+        jobBudget: job.estimatedBudget,
+        actionUrl: `/applied-jobs/${enquiry._id}`,
+      },
+      priority: "high",
+      actionRequired: true,
+    }).save().catch((e) => console.error("Notification error:", e));
+
+    // Email (non-blocking)
+    if (enquiry.userId?.email) {
+      const html = jobAcceptanceTemplate(
+        enquiry.userId.fullName || "Applicant",
+        jobTitle,
+        enquiry.postedBy.fullName || "Contractor",
+        { email: enquiry.postedBy.email, mobile: enquiry.postedBy.mobile }
+      );
+      sendEmail({
+        to: enquiry.userId.email,
+        subject: `✅ Application Accepted — ${jobTitle}`,
+        html,
+      }).catch((e) => console.error("Email error:", e));
+    }
+
+    // Activity log (non-blocking)
+    logActivity(
+      userId, "enquiry_accepted", enquiryId, "JobEnquiry",
+      `Connected with applicant for: ${jobTitle}`,
+      { jobTitle, applicantId: enquiry.userId._id, jobId: job._id },
+      req
+    ).catch((e) => console.error("Activity log error:", e));
+
+    await enquiry.populate("userId", "fullName email mobile profilePhotoUrl userType rating skills");
+
+    return res.status(200).json({
+      success: true,
+      message: `Connected successfully! ${enquiry.userId.fullName} has been notified.`,
+      data: {
+        enquiryId: enquiry._id,
+        status: enquiry.status,
+        acceptedAt: enquiry.acceptedAt,
+        jobTitle,
+        applicant: {
+          userId: enquiry.userId._id,
+          name: enquiry.userId.fullName,
+          email: enquiry.userId.email,
+          mobile: enquiry.userId.mobile,
+          profilePhoto: enquiry.userId.profilePhotoUrl,
+          userType: enquiry.userId.userType,
+          rating: enquiry.userId.rating,
+          skills: enquiry.userId.skills,
+        },
+        nextStep: "Once work is done, call POST /api/job-enquiries/:enquiryId/complete with rating & feedback",
+      },
+    });
+  } catch (error) {
+    console.error("connectApplication error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to connect application",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// ✅ COMPLETE APPLICATION (accepted → completed)
+// POST /api/job-enquiries/:enquiryId/complete
+// Job creator marks work as done + submits mandatory rating & feedback.
+// This creates a UserReview and updates the labour's profile rating.
+// ==========================================
+
+export const completeApplication = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { enquiryId } = req.params;
+    const { rating, feedback, ratingDetails } = req.body;
+
+    if (!enquiryId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: "Invalid enquiry ID format" });
+    }
+
+    // --- Validate mandatory rating + feedback ---
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "rating is required and must be between 1 and 5",
+      });
+    }
+    if (!feedback || String(feedback).trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "feedback is required and must be at least 10 characters",
+      });
+    }
+
+    // Validate optional ratingDetails
+    if (ratingDetails) {
+      const fields = ["workQuality", "communication", "timeliness", "professionalism"];
+      for (const f of fields) {
+        if (ratingDetails[f] !== undefined && (ratingDetails[f] < 1 || ratingDetails[f] > 5)) {
+          return res.status(400).json({
+            success: false,
+            message: `ratingDetails.${f} must be between 1 and 5`,
+          });
+        }
+      }
+    }
+
+    const enquiry = await JobEnquiry.findById(enquiryId)
+      .populate("jobId")
+      .populate("userId")
+      .populate("postedBy");
+
+    if (!enquiry) {
+      return res.status(404).json({ success: false, message: "Application not found" });
+    }
+
+    // Only the job creator can complete
+    if (enquiry.postedBy._id.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the job owner can mark an application as completed",
+      });
+    }
+
+    // Must be accepted before completing
+    if (enquiry.status !== "accepted") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete — application status is "${enquiry.status}". Must be "accepted" first.`,
+        currentStatus: enquiry.status,
+      });
+    }
+
+    const now = new Date();
+    const job = enquiry.jobId;
+    const labour = enquiry.userId;
+    const jobTitle = job?.workTitle || "Unknown Job";
+
+    // --- Check for duplicate review ---
+    const existingReview = await UserReview.findOne({
+      jobId: job._id,
+      userId: labour._id,
+      reviewedBy: userId,
+    });
+    if (existingReview) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already submitted a review for this application",
+      });
+    }
+
+    // --- 1. Update JobEnquiry: accepted → completed ---
+    enquiry.status = "completed";
+    enquiry.completedAt = now;
+    await enquiry.save();
+
+    // --- 2. Update UserJobHistory ---
+    await UserJobHistory.findOneAndUpdate(
+      { enquiryId },
+      {
+        status: "completed",
+        "timeline.completedAt": now,
+        isActive: false,
+      },
+      { new: true }
+    );
+
+    // --- 3. Create UserReview ---
+    const contractor = await User.findById(userId).select("fullName userType profilePhotoUrl");
+
+    const review = new UserReview({
+      jobId: job._id,
+      userId: labour._id,
+      reviewedBy: userId,
+      rating: Number(rating),
+      feedback: String(feedback).trim(),
+      ratingDetails: ratingDetails || {},
+      reviewType: "contractor_review",
+      isVerified: true,
+      jobDetails: {
+        workTitle: jobTitle,
+        estimatedBudget: job.estimatedBudget,
+        completedAt: now,
+      },
+      reviewerDetails: {
+        name: contractor?.fullName,
+        userType: contractor?.userType,
+        profilePhotoUrl: contractor?.profilePhotoUrl,
+      },
+      recipientDetails: {
+        name: labour?.fullName,
+        userType: labour?.userType,
+        rating: labour?.rating,
+      },
+    });
+    await review.save();
+
+    // --- 4. Recalculate labour's average rating ---
+    const currentTotalReviews = labour.totalReviews || 0;
+    const currentRating = labour.rating || 0;
+    const newTotalReviews = currentTotalReviews + 1;
+    const newRating =
+      Math.round(
+        ((currentRating * currentTotalReviews + Number(rating)) / newTotalReviews) * 10
+      ) / 10;
+
+    await User.findByIdAndUpdate(labour._id, {
+      rating: newRating,
+      totalReviews: newTotalReviews,
+      $inc: { completedJobs: 1 },
+    });
+
+    // --- 5. In-app notification to labour (non-blocking) ---
+    new Notification({
+      userId: labour._id,
+      notificationType: "job_completed",
+      enquiryId: enquiry._id,
+      jobId: job._id,
+      relatedUserId: userId,
+      title: `Job Completed — ${jobTitle}`,
+      message: `${contractor?.fullName} has marked your work on "${jobTitle}" as completed and left you a ${rating}⭐ review.`,
+      details: {
+        jobTitle,
+        jobBudget: job.estimatedBudget,
+        actionUrl: `/applied-jobs/${enquiry._id}`,
+      },
+      priority: "high",
+      actionRequired: false,
+    }).save().catch((e) => console.error("Notification error:", e));
+
+    // --- 6. Activity log (non-blocking) ---
+    logActivity(
+      userId, "job_completed", enquiryId, "JobEnquiry",
+      `Completed application and reviewed: ${jobTitle}`,
+      { jobTitle, applicantId: labour._id, rating, jobId: job._id },
+      req
+    ).catch((e) => console.error("Activity log error:", e));
+
+    return res.status(200).json({
+      success: true,
+      message: "Application marked as completed. Review submitted and labour profile updated.",
+      data: {
+        enquiryId: enquiry._id,
+        status: enquiry.status,
+        completedAt: enquiry.completedAt,
+        jobTitle,
+        review: {
+          reviewId: review._id,
+          rating: review.rating,
+          feedback: review.feedback,
+          ratingDetails: review.ratingDetails,
+        },
+        labourUpdated: {
+          userId: labour._id,
+          name: labour.fullName,
+          previousRating: currentRating,
+          newRating,
+          totalReviews: newTotalReviews,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("completeApplication error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to complete application",
       error: error.message,
     });
   }

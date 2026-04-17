@@ -9,6 +9,8 @@ import {
   withdrawEnquiry,
   getEnquiryDetails,
   addNotesToEnquiry,
+  connectApplication,
+  completeApplication,
 } from "../controllers/jobEnquiryController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
@@ -53,5 +55,13 @@ router.post("/:enquiryId/withdraw", authenticateToken, withdrawEnquiry);
 // ADD NOTES
 // PUT /api/job-enquiries/:enquiryId/notes - Job creator adds notes to enquiry
 router.put("/:enquiryId/notes", authenticateToken, addNotesToEnquiry);
+
+// CONNECT (pending → accepted)
+// POST /api/job-enquiries/:enquiryId/connect - Job creator connects/hires applicant
+router.post("/:enquiryId/connect", authenticateToken, connectApplication);
+
+// COMPLETE (accepted → completed) — mandatory rating + feedback
+// POST /api/job-enquiries/:enquiryId/complete - Job creator marks work done + submits review
+router.post("/:enquiryId/complete", authenticateToken, completeApplication);
 
 export default router;
