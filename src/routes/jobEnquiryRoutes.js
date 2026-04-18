@@ -11,6 +11,7 @@ import {
   addNotesToEnquiry,
   connectApplication,
   completeApplication,
+  submitFeedback,
 } from "../controllers/jobEnquiryController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
@@ -63,5 +64,9 @@ router.post("/:enquiryId/connect", authenticateToken, connectApplication);
 // COMPLETE (accepted → completed) — mandatory rating + feedback
 // POST /api/job-enquiries/:enquiryId/complete - Job creator marks work done + submits review
 router.post("/:enquiryId/complete", authenticateToken, completeApplication);
+
+// SUBMIT FEEDBACK (worker → job creator) — after job is completed
+// POST /api/job-enquiries/:enquiryId/submitfeedback - Applicant submits review for job creator
+router.post("/:enquiryId/submitfeedback", authenticateToken, submitFeedback);
 
 export default router;
