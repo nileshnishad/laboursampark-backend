@@ -1350,3 +1350,189 @@ export const completeApplication = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// ⭐ SUBMIT FEEDBACK (worker → job creator)
+// POST /api/job-enquiries/:enquiryId/submitfeedback
+// After a job is completed, the applicant (labour/sub_contractor)
+// submits their review of the job creator (contractor/sub_contractor).
+// ==========================================
+
+export const submitFeedback = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { enquiryId } = req.params;
+    const { rating, feedback, ratingDetails } = req.body;
+
+    if (!enquiryId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: "Invalid enquiry ID format" });
+    }
+
+    // --- Validate mandatory rating + feedback ---
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "rating is required and must be between 1 and 5",
+      });
+    }
+    if (!feedback || String(feedback).trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "feedback is required and must be at least 10 characters",
+      });
+    }
+
+    // Validate optional ratingDetails
+    if (ratingDetails) {
+      const fields = ["workQuality", "communication", "timeliness", "professionalism"];
+      for (const f of fields) {
+        if (ratingDetails[f] !== undefined && (ratingDetails[f] < 1 || ratingDetails[f] > 5)) {
+          return res.status(400).json({
+            success: false,
+            message: `ratingDetails.${f} must be between 1 and 5`,
+          });
+        }
+      }
+    }
+
+    const enquiry = await JobEnquiry.findById(enquiryId)
+      .populate("jobId")
+      .populate("userId")
+      .populate("postedBy");
+
+    if (!enquiry) {
+      return res.status(404).json({ success: false, message: "Application not found" });
+    }
+
+    // Only the applicant (worker) can submit feedback
+    if (enquiry.userId._id.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the applicant can submit feedback for the job creator",
+      });
+    }
+
+    // Job must be completed first
+    if (enquiry.status !== "completed") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot submit feedback — application status is "${enquiry.status}". Job must be completed first.`,
+      });
+    }
+
+    const job = enquiry.jobId;
+    const jobCreator = enquiry.postedBy;
+
+    // --- Check for duplicate review ---
+    const existingReview = await UserReview.findOne({
+      jobId: job._id,
+      userId: jobCreator._id,
+      reviewedBy: userId,
+    });
+    if (existingReview) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already submitted feedback for this job",
+      });
+    }
+
+    // Get worker details
+    const worker = await User.findById(userId).select("fullName userType profilePhotoUrl");
+
+    // --- Create UserReview: worker reviews job creator ---
+    const review = new UserReview({
+      jobId: job._id,
+      userId: jobCreator._id,       // Being reviewed: job creator
+      reviewedBy: userId,            // Reviewer: worker
+      rating: Number(rating),
+      feedback: String(feedback).trim(),
+      ratingDetails: ratingDetails || {},
+      reviewType: "worker_review",
+      isVerified: true,
+      jobDetails: {
+        workTitle: job.workTitle || "Unknown Job",
+        estimatedBudget: job.estimatedBudget,
+        completedAt: enquiry.completedAt,
+      },
+      reviewerDetails: {
+        name: worker?.fullName,
+        userType: worker?.userType,
+        profilePhotoUrl: worker?.profilePhotoUrl,
+      },
+      recipientDetails: {
+        name: jobCreator?.fullName,
+        userType: jobCreator?.userType,
+        rating: jobCreator?.rating,
+      },
+    });
+    await review.save();
+
+    // --- Recalculate job creator's average rating ---
+    const currentTotalReviews = jobCreator.totalReviews || 0;
+    const currentRating = jobCreator.rating || 0;
+    const newTotalReviews = currentTotalReviews + 1;
+    const newRating =
+      Math.round(
+        ((currentRating * currentTotalReviews + Number(rating)) / newTotalReviews) * 10
+      ) / 10;
+
+    await User.findByIdAndUpdate(jobCreator._id, {
+      rating: newRating,
+      totalReviews: newTotalReviews,
+    });
+
+    // --- Notification to job creator (non-blocking) ---
+    new Notification({
+      userId: jobCreator._id,
+      notificationType: "feedback_received",
+      enquiryId: enquiry._id,
+      jobId: job._id,
+      relatedUserId: userId,
+      title: `Feedback Received — ${job.workTitle}`,
+      message: `${worker?.fullName} has submitted a ${rating}⭐ review for "${job.workTitle}".`,
+      details: {
+        jobTitle: job.workTitle,
+        actionUrl: `/my-jobs/${job._id}`,
+      },
+      priority: "medium",
+      actionRequired: false,
+    }).save().catch((e) => console.error("Notification error:", e));
+
+    // --- Activity log (non-blocking) ---
+    logActivity(
+      userId, "feedback_submitted", enquiryId, "JobEnquiry",
+      `Submitted feedback for job creator: ${job.workTitle}`,
+      { jobTitle: job.workTitle, jobCreatorId: jobCreator._id, rating, jobId: job._id },
+      req
+    ).catch((e) => console.error("Activity log error:", e));
+
+    return res.status(200).json({
+      success: true,
+      message: "Feedback submitted successfully. Job creator's profile updated.",
+      data: {
+        enquiryId: enquiry._id,
+        jobTitle: job.workTitle,
+        review: {
+          reviewId: review._id,
+          rating: review.rating,
+          feedback: review.feedback,
+          ratingDetails: review.ratingDetails,
+        },
+        jobCreatorUpdated: {
+          userId: jobCreator._id,
+          name: jobCreator.fullName,
+          previousRating: currentRating,
+          newRating,
+          totalReviews: newTotalReviews,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("submitFeedback error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit feedback",
+      error: error.message,
+    });
+  }
+};
