@@ -21,6 +21,7 @@ import userReviewRoutes from "./routes/userReviewRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
+import smsRoutes from "./routes/smsRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -46,6 +47,11 @@ app.use(cors({ origin: "*" }));
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+// ==========================================
+// SMS/OTP Routes (must be after app is initialized)
+// ==========================================
+app.use("/api/sms", smsRoutes);
 
 // ==========================================
 // 📁 HEALTH CHECK & BASIC ROUTES
