@@ -22,6 +22,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import smsRoutes from "./routes/smsRoutes.js";
+import twilioRoutes from "./routes/twilioRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -167,6 +168,9 @@ app.use("/api/notifications", notificationRoutes);
 // GET /api/payments/:paymentId/status - Get payment status for logged-in user
 // GET /api/payments/history - Get user payment history
 app.use("/api/payments", paymentRoutes);
+
+// Twilio Routes
+app.use("/api/twilio", twilioRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
