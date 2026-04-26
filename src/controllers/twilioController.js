@@ -23,13 +23,20 @@ export const verifyTwilioOtp = async (req, res) => {
     if (!to || !code) {
       return res.status(400).json({ success: false, message: "'to' (phone number) and 'code' are required" });
     }
+    console.log("[verifyTwilioOtp] Received to:", to, "code:", code);
     const result = await checkVerificationCode(to, code);
+    console.log("[verifyTwilioOtp] Twilio result:", result);
     // If OTP is valid and approved, update user OTPstatus
     if (result && result.status === "approved" && result.valid) {
-      await User.findOneAndUpdate(
+      // Format 'to' to E.164 (+91) if needed
+     
+      console.log("[verifyTwilioOtp] Looking for user with mobile:", to);
+      const updateResult = await User.findOneAndUpdate(
         { mobile: to },
-        { OTPstatus: "active" }
+        { OTPstatus: "active" },
+        { new: true }
       );
+      console.log("[verifyTwilioOtp] User update result:", updateResult);
     }
     res.status(200).json({ success: true, message: "OTP verification result", data: result });
   } catch (error) {
