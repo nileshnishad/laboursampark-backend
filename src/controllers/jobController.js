@@ -3,6 +3,8 @@ import JobEnquiry from "../models/JobEnquiry.js";
 import User from "../models/User.js";
 import UserJobHistory from "../models/UserJobHistory.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { contractorJobCreatedSms, subContractorJobCreatedSms } from "../utils/twilio/templates/smsTemplates.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
 
 // ==========================================
 // 📋 CREATE JOB
@@ -206,6 +208,27 @@ export const createJob = async (req, res) => {
         jobCreatedAs: "inactive",
         suggestion: "Go to 'My Jobs' and deactivate one of your active jobs, then activate this job.",
       };
+    }
+
+    // Send SMS to job creator about job creation
+    try {
+      const creatorMobile = user.mobile;
+      const creatorName = user.fullName;
+      let smsBody;
+      if (user.userType === "contractor") {
+        smsBody = contractorJobCreatedSms(creatorName, job._id);
+      } else if (user.userType === "sub_contractor") {
+        smsBody = subContractorJobCreatedSms(creatorName, job._id);
+      }
+      if (smsBody) {
+        await sendTwilioSms({
+          to: creatorMobile,
+          body: smsBody,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+        });
+      }
+    } catch (smsErr) {
+      console.error("Failed to send job created SMS:", smsErr);
     }
 
     res.status(201).json(response);

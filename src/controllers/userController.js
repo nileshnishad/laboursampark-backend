@@ -3,16 +3,26 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import { forgotPasswordTemplate } from "../utils/templates/forgotPasswordTemplate.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
+import {
+  labourWelcomeSms,
+  contractorWelcomeSms,
+  subContractorWelcomeSms,
+  labourRatingReceivedSms,
+  contractorRatingReceivedSms,
+  subContractorRatingReceivedSms
+} from "../utils/twilio/templates/smsTemplates.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
 
 // Register User
 export const register = async (req, res) => {
   console.log("register lkog");
-  
+
   try {
- 
-    
+
+
     const { fullName, email, password, mobile, userType } = req.body;
-      
+
 
     // Validation
     if (!fullName || !email || !password || !mobile || !userType) {
@@ -52,7 +62,7 @@ export const register = async (req, res) => {
     }
 
     // Validate userType
-    const validUserTypes = ["labour", "contractor","sub_contractor","admin","super_admin"];
+    const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin"];
     if (!validUserTypes.includes(userType.toLowerCase())) {
       return res.status(400).json({
         success: false,
@@ -60,9 +70,17 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create new user with all fields from payload
+
+    // Always store mobile number with +91 prefix if 10 digits
+    let formattedMobile = mobile;
+    if (/^\d{10}$/.test(formattedMobile)) {
+      formattedMobile = "+91" + formattedMobile;
+    }
+
+    // Create new user with all fields from payload, but formatted mobile
     const userData = {
       ...req.body,
+      mobile: formattedMobile,
       userType: userType.toLowerCase(),
     };
 
@@ -80,6 +98,30 @@ export const register = async (req, res) => {
 
     // Save user (password will be hashed by pre-save hook)
     await user.save();
+
+
+    // formattedMobile is already set above for userData, so just use it below
+
+    // Send welcome SMS based on userType
+    let smsBody;
+    if (user.userType === "labour") {
+      smsBody = labourWelcomeSms(user.fullName);
+    } else if (user.userType === "contractor") {
+      smsBody = contractorWelcomeSms(user.fullName);
+    } else if (user.userType === "sub_contractor") {
+      smsBody = subContractorWelcomeSms(user.fullName);
+    }
+    if (smsBody) {
+      try {
+        await sendTwilioSms({
+          to: formattedMobile,
+          body: smsBody,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+        });
+      } catch (smsError) {
+        console.error("Failed to send welcome SMS:", smsError);
+      }
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -177,8 +219,8 @@ export const login = async (req, res) => {
 
     // Generate JWT token with userType included
     const token = jwt.sign(
-      { 
-        userId: user._id, 
+      {
+        userId: user._id,
         email: user.email,
         mobile: user.mobile,
         userType: user.userType,
@@ -415,7 +457,7 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    const updateData = {...req.body}; // Create copy to avoid mutating req.body
+    const updateData = { ...req.body }; // Create copy to avoid mutating req.body
 
     // Fields that cannot be updated
     const restrictedFields = ["_id", "password", "email", "mobile", "createdAt", "resetPasswordToken", "resetPasswordExpire", "emailVerificationToken", "emailVerificationExpire"];
@@ -468,7 +510,7 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Update profile error:", error.name, error.message);
-    
+
     // Handle specific MongoDB errors
     if (error.name === "CastError") {
       return res.status(400).json({

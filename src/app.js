@@ -23,6 +23,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import smsRoutes from "./routes/smsRoutes.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
+import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -171,6 +172,9 @@ app.use("/api/payments", paymentRoutes);
 
 // Twilio Routes
 app.use("/api/twilio", twilioRoutes);
+
+// Subscription Routes
+app.use("/api/subscription", subscriptionRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE

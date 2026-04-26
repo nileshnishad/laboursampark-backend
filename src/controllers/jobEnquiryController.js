@@ -8,6 +8,16 @@ import { logActivity } from "../utils/activityLogger.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { jobRejectionTemplate } from "../utils/templates/jobRejectionTemplate.js";
 import { jobAcceptanceTemplate } from "../utils/templates/jobAcceptanceTemplate.js";
+import {
+  contractorApplicationReceivedSms,
+  labourJobAcceptedSms,
+  labourJobAssignedSms,
+  contractorJobCreatedSms,
+  contractorJobCompletedSms,
+  labourRatingReceivedSms,
+  contractorRatingReceivedSms
+} from "../utils/twilio/templates/smsTemplates.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
 
 // ==========================================
 // 📧 CREATE JOB ENQUIRY (Apply to Job)
@@ -152,6 +162,20 @@ export const createEnquiry = async (req, res) => {
 
     await userJobHistory.save();
     console.log("✅ UserJobHistory saved successfully:", userJobHistory._id);
+
+    // Send SMS to job creator about new application
+    try {
+      const creatorMobile = job.createdBy.mobile;
+      const creatorName = job.createdBy.fullName;
+      const smsBody = contractorApplicationReceivedSms(creatorName, jobId);
+      await sendTwilioSms({
+        to: creatorMobile,
+        body: smsBody,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+      });
+    } catch (smsErr) {
+      console.error("Failed to send application received SMS:", smsErr);
+    }
 
     // Log activity (non-blocking)
     logActivity(
@@ -605,6 +629,20 @@ export const acceptEnquiry = async (req, res) => {
       });
     }
 
+    // Send SMS to applicant about acceptance
+    try {
+      const applicantMobile = enquiry.userId.mobile;
+      const applicantName = enquiry.userId.fullName;
+      const smsBody = labourJobAcceptedSms(applicantName, enquiry.jobId._id);
+      await sendTwilioSms({
+        to: applicantMobile,
+        body: smsBody,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+      });
+    } catch (smsErr) {
+      console.error("Failed to send job acceptance SMS:", smsErr);
+    }
+
     await enquiry.populate("userId", "fullName email mobile profilePhotoUrl");
 
     res.status(200).json({
@@ -754,6 +792,9 @@ export const rejectEnquiry = async (req, res) => {
         // Don't fail the API if email fails
       });
     }
+
+    // Send SMS to applicant about rejection (optional, can add a template if needed)
+    // Example: sendTwilioSms({ to: applicantMobile, body: "Your application was not selected.", messagingServiceSid: ... })
 
     await enquiry.populate("userId", "fullName email mobile profilePhotoUrl");
 
@@ -1236,6 +1277,20 @@ export const completeApplication = async (req, res) => {
     enquiry.completedAt = now;
     await enquiry.save();
 
+    // Send SMS to contractor about job completion
+    try {
+      const contractorMobile = job.createdBy.mobile;
+      const contractorName = job.createdBy.fullName;
+      const smsBody = contractorJobCompletedSms(contractorName, job._id);
+      await sendTwilioSms({
+        to: contractorMobile,
+        body: smsBody,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+      });
+    } catch (smsErr) {
+      console.error("Failed to send job completed SMS to contractor:", smsErr);
+    }
+
     // --- 2. Update UserJobHistory ---
     await UserJobHistory.findOneAndUpdate(
       { enquiryId },
@@ -1276,6 +1331,20 @@ export const completeApplication = async (req, res) => {
       },
     });
     await review.save();
+
+    // Send SMS to labour about rating received
+    try {
+      const labourMobile = labour.mobile;
+      const labourName = labour.fullName;
+      const smsBody = labourRatingReceivedSms(labourName, rating);
+      await sendTwilioSms({
+        to: labourMobile,
+        body: smsBody,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID
+      });
+    } catch (smsErr) {
+      console.error("Failed to send rating received SMS to labour:", smsErr);
+    }
 
     // --- 4. Recalculate labour's average rating ---
     const currentTotalReviews = labour.totalReviews || 0;
