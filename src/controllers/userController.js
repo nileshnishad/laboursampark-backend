@@ -12,7 +12,6 @@ import {
   contractorRatingReceivedSms,
   subContractorRatingReceivedSms
 } from "../utils/twilio/templates/smsTemplates.js";
-import { sendTwilioSms } from "../utils/twilio/verifyService.js";
 
 // Register User
 export const register = async (req, res) => {
