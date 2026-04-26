@@ -280,6 +280,12 @@ const userSchema = new mongoose.Schema(
     // Additional Notes
     adminNotes: String,
     blockReason: String,
+
+    OTPstatus: {
+      type: String,
+      default: "inactive",
+      enum: ["inactive", "active"]
+    },
   },
   {
     timestamps: true,
