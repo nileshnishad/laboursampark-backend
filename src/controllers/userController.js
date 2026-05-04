@@ -536,6 +536,65 @@ export const updateProfile = async (req, res) => {
 };
 
 // ==========================================
+// ⚙️ CONFIG CHECK (SAVE/UPDATE FCM TOKEN)
+// ==========================================
+
+export const configCheck = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { fcmToken } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    if (!fcmToken || typeof fcmToken !== "string" || fcmToken.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Valid fcmToken is required",
+      });
+    }
+
+    const sanitizedToken = fcmToken.trim();
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: { deviceTokens: [sanitizedToken] },
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Config check successful and FCM token updated",
+      data: {
+        tokenSaved: true,
+        tokenReplaced: true,
+        totalDeviceTokens: Array.isArray(user.deviceTokens) ? user.deviceTokens.length : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Config check error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while saving FCM token",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
 // 🔐 FORGOT PASSWORD
 // ==========================================
 
