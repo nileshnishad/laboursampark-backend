@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword } from "../controllers/userController.js";
+import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck } from "../controllers/userController.js";
 import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
@@ -45,6 +45,9 @@ router.patch("/profile", authenticateToken, updateProfile);
 
 // POST /api/users/change-password - Change password for authenticated user (PROTECTED)
 router.post("/change-password", authenticateToken, changePassword);
+
+// POST /api/users/config-check - Validate app config and save FCM token (PROTECTED)
+router.post("/config-check", authenticateToken, configCheck);
 
 // GET /api/users/visible - Get visible users (contractors/labour) (PROTECTED)
 router.get("/visible", authenticateToken, getVisibleUsers);
