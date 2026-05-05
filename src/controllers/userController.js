@@ -299,6 +299,7 @@ export const login = async (req, res) => {
       // Availability & Status
       availability: userData.availability,
       status: userData.status,
+      OTPstatus: userData.OTPstatus,
       isOnline: userData.isOnline,
       termsAgreed: userData.termsAgreed,
 
