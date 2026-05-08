@@ -1,5 +1,6 @@
 
 import Skills from '../models/Skills.js';
+import BusinessName from '../models/BusinessName.js';
 import User from '../models/User.js';
 import Job from '../models/Job.js';
 import UserReview from '../models/UserReview.js';
@@ -254,6 +255,162 @@ export const updateSkill = async (req, res) => {
 
     console.error('Error updating skill:', error);
     return res.status(500).json({ success: false, message: 'Failed to update skill' });
+  }
+};
+
+export const getAllBusinessName = async (req, res) => {
+  try {
+    const businesses = await BusinessName.find({}, { _id: 1, enName: 1, hiName: 1, mrName: 1, name: 1, category: 1 })
+      .sort({ enName: 1, name: 1 })
+      .lean();
+
+    const businessNames = businesses.map((b) => ({
+      id: b._id,
+      enName: b.enName || b.name || '',
+      hiName: b.hiName || '',
+      mrName: b.mrName || '',
+      category: b.category || '',
+    }));
+
+    res.json({
+      success: true,
+      total: businessNames.length,
+      businesses: businessNames,
+    });
+  } catch (error) {
+    console.error('Error fetching all business names:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch business names' });
+  }
+};
+
+export const addBusinessName = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+
+    if (items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Request body cannot be empty' });
+    }
+
+    // Validate all items first
+    for (let i = 0; i < items.length; i++) {
+      const { enName, name } = items[i];
+      const normalizedEnName = String(enName || name || '').trim();
+      if (!normalizedEnName) {
+        return res.status(400).json({
+          success: false,
+          message: `enName is required at index ${i}`,
+        });
+      }
+    }
+
+    const docs = items.map(({ enName, hiName, mrName, name, description, category }) => {
+      const normalizedEnName = String(enName || name || '').trim();
+      return {
+        enName: normalizedEnName,
+        hiName: String(hiName || '').trim(),
+        mrName: String(mrName || '').trim(),
+        name: normalizedEnName,
+        description,
+        category,
+        lang: ['hi', 'en', 'mr'],
+        createdBy: userId,
+        updatedBy: userId,
+      };
+    });
+
+    const result = await BusinessName.insertMany(docs, { ordered: false });
+
+    res.json({
+      success: true,
+      message: `${result.length} business name(s) added successfully`,
+      inserted: result.length,
+    });
+  } catch (error) {
+    if (error?.code === 11000 || error?.name === 'MongoBulkWriteError') {
+      const inserted = error?.result?.nInserted ?? 0;
+      const duplicates = (error?.writeErrors || []).map((e) => e?.err?.op?.enName).filter(Boolean);
+      return res.status(409).json({
+        success: false,
+        message: 'Some business names already exist',
+        inserted,
+        duplicates,
+      });
+    }
+    console.error('Error adding business name:', error);
+    res.status(500).json({ success: false, message: 'Failed to add business name' });
+  }
+};
+
+export const updateBusinessName = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { businessId } = req.params;
+    const { enName, hiName, mrName, name, description, category } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!businessId) {
+      return res.status(400).json({ success: false, message: 'businessId is required' });
+    }
+
+    const existingBusiness = await BusinessName.findById(businessId);
+    if (!existingBusiness) {
+      return res.status(404).json({ success: false, message: 'Business name not found' });
+    }
+
+    const normalizedEnName =
+      enName !== undefined
+        ? String(enName || '').trim()
+        : name !== undefined
+          ? String(name || '').trim()
+          : undefined;
+
+    if (normalizedEnName !== undefined && !normalizedEnName) {
+      return res.status(400).json({ success: false, message: 'enName cannot be empty' });
+    }
+
+    const updatePayload = { updatedBy: userId };
+
+    if (normalizedEnName !== undefined) {
+      updatePayload.enName = normalizedEnName;
+      updatePayload.name = normalizedEnName;
+    }
+    if (hiName !== undefined) updatePayload.hiName = String(hiName || '').trim();
+    if (mrName !== undefined) updatePayload.mrName = String(mrName || '').trim();
+    if (description !== undefined) updatePayload.description = String(description || '').trim();
+    if (category !== undefined) updatePayload.category = String(category || '').trim();
+
+    const updatedBusiness = await BusinessName.findByIdAndUpdate(businessId, updatePayload, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    return res.json({
+      success: true,
+      message: 'Business name updated successfully',
+      business: {
+        ...updatedBusiness,
+        createdByName: updatedBusiness.createdBy?.fullName || null,
+        updatedByName: updatedBusiness.updatedBy?.fullName || null,
+      },
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Business name already exists' });
+    }
+    console.error('Error updating business name:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update business name' });
   }
 };
 
