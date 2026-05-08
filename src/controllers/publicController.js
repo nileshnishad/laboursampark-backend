@@ -150,6 +150,30 @@ export const addSkills = async (req, res) => {
   }
 };
 
+export const getAllSkillsName = async (req, res) => {
+  try {
+    const skills = await Skills.find({}, { _id: 1, enName: 1, hiName: 1, mrName: 1, name: 1 })
+      .sort({ enName: 1, name: 1 })
+      .lean();
+
+    const skillNames = skills.map((skill) => ({
+      id: skill._id,
+      enName: skill.enName || skill.name || '',
+      hiName: skill.hiName || '',
+      mrName: skill.mrName || '',
+    }));
+
+    res.json({
+      success: true,
+      total: skillNames.length,
+      skills: skillNames,
+    });
+  } catch (error) {
+    console.error('Error fetching all skill names:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch skill names' });
+  }
+};
+
 export const updateSkill = async (req, res) => {
   try {
     const userId = req.userId;
