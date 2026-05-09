@@ -646,6 +646,43 @@ export const getPaymentStatus = async (req, res) => {
   }
 };
 
+// ─── Mobile hash generation ──────────────────────────────────────────────────
+// The PayU native SDK fires generateHash() for multiple internal operations
+// (get_sdk_configuration, get_checkout_details, get_all_offer_details, etc.).
+// Each call sends a hashString (with a trailing "|SALT" placeholder) and
+// expects sha512(hashString_with_salt_replaced) back.
+// The salt never leaves the server.
+export const generatePayUHash = async (req, res) => {
+  try {
+    const { hashString } = req.body;
+
+    if (!hashString || typeof hashString !== "string" || !hashString.trim()) {
+      return res.status(400).json({ success: false, message: "hashString is required" });
+    }
+
+    const { key, salt } = getPayUConfig();
+
+    // Security: every legitimate hashString from the SDK starts with the
+    // merchant key so we reject anything that doesn't — prevents misuse.
+    if (!hashString.startsWith(key)) {
+      return res.status(400).json({ success: false, message: "Invalid hashString" });
+    }
+
+    // PayU SDK appends the literal word "SALT" as a placeholder at the end.
+    // Replace it with the real salt before hashing.
+    const normalized = hashString.endsWith("|SALT")
+      ? hashString.slice(0, -5) + salt          // replace "|SALT" with actual salt
+      : hashString + salt;                       // fallback: plain append (some SDK versions)
+
+    const hash = sha512(normalized);
+
+    return res.status(200).json({ success: true, hash });
+  } catch (error) {
+    console.error("PayU hash generation error:", error);
+    return res.status(500).json({ success: false, message: "Failed to generate hash" });
+  }
+};
+
 // ─── Mobile / Android (Flutter) ─────────────────────────────────────────────
 // Returns raw PayU params + server-computed hash so the Flutter SDK can open
 // the native PayU screen directly.  The existing web flow is untouched.
