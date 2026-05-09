@@ -646,6 +646,144 @@ export const getPaymentStatus = async (req, res) => {
   }
 };
 
+// ─── Mobile / Android (Flutter) ─────────────────────────────────────────────
+// Returns raw PayU params + server-computed hash so the Flutter SDK can open
+// the native PayU screen directly.  The existing web flow is untouched.
+export const initPayUMobilePayment = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      amount,
+      productInfo,
+      purpose = "general",
+      description,
+      firstName,
+      email,
+      phone,
+      metadata = {},
+      checkoutTtlMinutes = DEFAULT_CHECKOUT_TTL_MINUTES,
+    } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: "Valid amount is required" });
+    }
+
+    if (!productInfo || !String(productInfo).trim()) {
+      return res.status(400).json({ success: false, message: "productInfo is required" });
+    }
+
+    const user = await User.findById(userId).select("fullName email mobile").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const resolvedFirstName = String(firstName || user.fullName || "Customer").trim();
+    const resolvedEmail = String(email || user.email || "").trim();
+    const resolvedPhone = String(phone || user.mobile || "").trim();
+
+    if (!resolvedEmail) {
+      return res.status(400).json({ success: false, message: "Email is required for payment" });
+    }
+
+    const parsedAmount = Number(amount);
+    const ttl = Number(checkoutTtlMinutes) > 0 ? Number(checkoutTtlMinutes) : DEFAULT_CHECKOUT_TTL_MINUTES;
+    const checkoutExpiresAt = new Date(Date.now() + ttl * 60 * 1000);
+    const txnId = createTxnid();
+    const paymentUrlToken = createPaymentToken();
+    const receipt = `payu_${txnId}`;
+
+    const payment = await Payment.create({
+      userId,
+      gateway: "payu",
+      txnId,
+      receipt,
+      amount: parsedAmount,
+      currency: "INR",
+      purpose,
+      productInfo: String(productInfo).trim(),
+      description,
+      status: "pending",               // pending immediately — SDK takes user to PayU screen
+      paymentUrlToken,
+      checkoutExpiresAt,
+      customer: {
+        firstName: resolvedFirstName,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+      },
+      // No frontendRedirects — callbacks return JSON for mobile
+      frontendRedirects: { successUrl: "", failureUrl: "" },
+      metadata: { ...metadata, channel: "android" },
+    });
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        $inc: { "paymentSummary.totalTransactions": 1 },
+        $set: { "paymentSummary.lastPaymentStatus": "pending" },
+      },
+    );
+
+    const { key, salt } = getPayUConfig();
+    const callbackBase = getCallbackBaseUrl(req);
+    const surl = `${callbackBase}/api/payments/payu/callback/success`;
+    const furl = `${callbackBase}/api/payments/payu/callback/failure`;
+    const udf1 = String(payment._id);
+
+    const hash = buildPaymentHash({
+      key,
+      txnid: txnId,
+      amount: parsedAmount,
+      productinfo: payment.productInfo,
+      firstname: resolvedFirstName,
+      email: resolvedEmail,
+      udf1,
+      udf2: "",
+      udf3: "",
+      udf4: "",
+      udf5: "",
+      salt,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "PayU mobile payment initialised",
+      data: {
+        paymentId: String(payment._id),
+        // Raw params for Flutter PayU SDK
+        key,
+        txnid: txnId,
+        amount: toMoneyString(parsedAmount),
+        productinfo: payment.productInfo,
+        firstname: resolvedFirstName,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        udf1,
+        udf2: "",
+        udf3: "",
+        udf4: "",
+        udf5: "",
+        surl,
+        furl,
+        hash,
+        // Convenience fields
+        currency: "INR",
+        expiresAt: checkoutExpiresAt,
+      },
+    });
+  } catch (error) {
+    console.error("Init PayU mobile payment error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to initialise PayU mobile payment",
+      error: error.message,
+    });
+  }
+};
+
 export const getPaymentHistory = async (req, res) => {
   try {
     const userId = req.userId;
