@@ -692,7 +692,9 @@ export const initPayUMobilePayment = async (req, res) => {
     const parsedAmount = Number(amount);
     const ttl = Number(checkoutTtlMinutes) > 0 ? Number(checkoutTtlMinutes) : DEFAULT_CHECKOUT_TTL_MINUTES;
     const checkoutExpiresAt = new Date(Date.now() + ttl * 60 * 1000);
-    const txnId = createTxnid();
+    // PayU native SDK validates txnid is alphanumeric-only (no underscores / special chars).
+    // Web flow uses TXN_xxx_yyy (underscores OK for browser POST); mobile must use no underscores.
+    const txnId = `TXN${Date.now()}${crypto.randomBytes(4).toString("hex")}`;
     const paymentUrlToken = createPaymentToken();
     const receipt = `payu_${txnId}`;
 
