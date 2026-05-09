@@ -660,19 +660,16 @@ export const generatePayUHash = async (req, res) => {
       return res.status(400).json({ success: false, message: "hashString is required" });
     }
 
-    const { key, salt } = getPayUConfig();
+    const { salt } = getPayUConfig();
 
-    // Security: every legitimate hashString from the SDK starts with the
-    // merchant key so we reject anything that doesn't — prevents misuse.
-    if (!hashString.startsWith(key)) {
-      return res.status(400).json({ success: false, message: "Invalid hashString" });
-    }
-
-    // PayU SDK appends the literal word "SALT" as a placeholder at the end.
-    // Replace it with the real salt before hashing.
+    // The SDK sends hashStrings ending with a trailing "|" — the salt is appended directly.
+    // Some SDK operations (get_sdk_configuration, get_checkout_details) start with the merchant key.
+    // Others (get_all_offer_details, quickPayEvent) are JSON-based and do not.
+    // The endpoint is already authenticated via Bearer token, so no additional key check is needed.
+    // The salt never leaves the server.
     const normalized = hashString.endsWith("|SALT")
-      ? hashString.slice(0, -5) + salt          // replace "|SALT" with actual salt
-      : hashString + salt;                       // fallback: plain append (some SDK versions)
+      ? hashString.slice(0, -5) + salt   // SDK versions that append literal "|SALT"
+      : hashString + salt;               // SDK versions that send raw string with trailing "|"
 
     const hash = sha512(normalized);
 
