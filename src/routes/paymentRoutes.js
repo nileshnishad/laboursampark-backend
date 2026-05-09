@@ -6,6 +6,7 @@ import {
   handlePayUSuccessCallback,
   handlePayUFailureCallback,
   initPayUMobilePayment,
+  generatePayUHash,
   getPaymentStatus,
   getPaymentHistory,
 } from "../controllers/paymentController.js";
@@ -20,6 +21,9 @@ router.post("/payu/callback/failure", handlePayUFailureCallback);
 
 // Android / Flutter — returns raw params for native PayU SDK
 router.post("/payu/init", authenticateToken, initPayUMobilePayment);
+
+// Android / Flutter — dynamic hash generation for PayU SDK's generateHash callback
+router.post("/payu/hash", authenticateToken, generatePayUHash);
 
 router.get("/:paymentId/status", authenticateToken, getPaymentStatus);
 router.get("/history", authenticateToken, getPaymentHistory);
