@@ -255,6 +255,13 @@ const userSchema = new mongoose.Schema(
     planExpiryDate: Date,
     planStartDate: Date,
 
+    // Unique User Code (e.g. LS26000001 — year + serial)
+    userCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
     // Social & Referral
     socialLinks: {
       linkedin: String,
@@ -294,6 +301,7 @@ const userSchema = new mongoose.Schema(
 
 // Index for geospatial queries
 userSchema.index({ "location.coordinates": "2dsphere" });
+userSchema.index({ userCode: 1 }, { unique: true, sparse: true });
 
 // Validate and fix location coordinates before saving
 userSchema.pre("save", function () {

@@ -95,6 +95,22 @@ export const register = async (req, res) => {
 
     const user = new User(userData);
 
+    // Auto-generate userCode: LS<YY><6-digit serial> e.g. LS26000001
+    // Find the last userCode for this year and increment
+    const yy = String(new Date().getFullYear()).slice(-2);
+    const prefix = `LS${yy}`;
+    const lastUser = await User.findOne(
+      { userCode: { $regex: `^${prefix}` } },
+      { userCode: 1 },
+    ).sort({ userCode: -1 }).lean();
+
+    let serial = 1;
+    if (lastUser?.userCode) {
+      const lastSerial = parseInt(lastUser.userCode.slice(prefix.length), 10);
+      if (!isNaN(lastSerial)) serial = lastSerial + 1;
+    }
+    user.userCode = `${prefix}${String(serial).padStart(6, "0")}`;
+
     // Save user (password will be hashed by pre-save hook)
     await user.save();
 
