@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck } from "../controllers/userController.js";
+import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP } from "../controllers/userController.js";
 import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
 
@@ -20,6 +20,15 @@ router.post("/forgot-password", publicEndpoint, forgotPassword);
 
 // POST /api/users/reset-password - Reset password with token (PUBLIC)
 router.post("/reset-password", publicEndpoint, resetPassword);
+
+// POST /api/users/send-otp - Send OTP to user email (PUBLIC)
+router.post("/send-otp", publicEndpoint, sendOTP);
+
+// POST /api/users/verify-otp - Verify OTP from database (PUBLIC)
+router.post("/verify-otp", publicEndpoint, verifyOTP);
+
+// POST /api/users/reset-password-otp - Reset password after OTP verification (PUBLIC)
+router.post("/reset-password-otp", publicEndpoint, resetPasswordWithOTP);
 
 // GET /api/users/labours - Get all labour users with display=true (PUBLIC)
 router.get("/labours", getLabours);
