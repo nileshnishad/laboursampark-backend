@@ -851,3 +851,332 @@ export const changePassword = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// 📧 SEND OTP (Generic OTP for any verification)
+// ==========================================
+
+export const sendOTP = async (req, res) => {
+  try {
+    const { email, mobile } = req.body;
+
+    // Validation - either email or mobile required
+    if (!email && !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or mobile number",
+      });
+    }
+
+    // Find user by email or mobile
+    const user = await User.findOne({
+      $or: [
+        email && { email },
+        mobile && { mobile },
+      ].filter(Boolean),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with provided email or mobile",
+      });
+    }
+
+    // Generate 6-digit OTP (mix of uppercase letters and numbers)
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let otp = "";
+    for (let i = 0; i < 6; i++) {
+      otp += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+
+    // Save OTP in database with 10 minutes expiry
+    user.verificationOTP = otp;
+    user.verificationOTPExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await user.save();
+
+    // Prepare email content
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .otp-box { background: white; padding: 20px; margin: 20px 0; text-align: center; border-radius: 8px; border: 2px solid #667eea; }
+          .otp-code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #667eea; font-family: monospace; }
+          .footer { text-align: center; padding: 20px; color: #888; font-size: 12px; }
+          .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Verification OTP</h1>
+          </div>
+          <div class="content">
+            <p>Hello <strong>${user.fullName || "User"}</strong>,</p>
+            <p>You requested a verification OTP for your Labour Sampark account. Use the code below to complete your verification:</p>
+            
+            <div class="otp-box">
+              <p style="margin: 0; color: #666; font-size: 14px;">Your Verification Code</p>
+              <p class="otp-code">${otp}</p>
+              <p style="margin: 0; color: #888; font-size: 12px;">Valid for 10 minutes</p>
+            </div>
+
+            <div class="warning">
+              <strong>⚠️ Security Note:</strong> Never share this OTP with anyone. Labour Sampark staff will never ask for your OTP.
+            </div>
+
+            <p>If you didn't request this OTP, please ignore this email or contact our support team.</p>
+            
+            <p style="margin-top: 30px;">
+              Best regards,<br>
+              <strong>Labour Sampark Team</strong>
+            </p>
+          </div>
+          <div class="footer">
+            <p>This is an automated email. Please do not reply to this message.</p>
+            <p>&copy; ${new Date().getFullYear()} Labour Sampark. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send OTP via email
+    const emailResult = await sendEmail({
+      to: user.email,
+      subject: `Your Verification OTP: ${otp} - Labour Sampark`,
+      html: emailHtml,
+      text: `Your verification OTP is: ${otp}. This code will expire in 10 minutes. Do not share this code with anyone.`,
+    });
+
+    if (!emailResult.success) {
+      console.error("Failed to send OTP email:", emailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email. Please try again later.",
+        error: emailResult.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "OTP has been sent to your email successfully",
+      data: {
+        message: "Please check your email for the 6-digit verification code",
+        expiresIn: "10 minutes",
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Send OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while sending OTP",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// ✅ VERIFY OTP (Verify OTP from database)
+// ==========================================
+
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, mobile, otp } = req.body;
+
+    // Validation
+    if (!email && !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or mobile number",
+      });
+    }
+
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide OTP code",
+      });
+    }
+
+    // Validate OTP format (should be 6 characters)
+    if (otp.length !== 6) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP must be 6 characters long",
+      });
+    }
+
+    // Find user by email or mobile
+    const user = await User.findOne({
+      $or: [
+        email && { email },
+        mobile && { mobile },
+      ].filter(Boolean),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with provided email or mobile",
+      });
+    }
+
+    // Check if OTP exists
+    if (!user.verificationOTP) {
+      return res.status(400).json({
+        success: false,
+        message: "No OTP found. Please request a new OTP first",
+      });
+    }
+
+    // Check if OTP has expired
+    if (user.verificationOTPExpire && new Date() > user.verificationOTPExpire) {
+      // Clear expired OTP
+      user.verificationOTP = undefined;
+      user.verificationOTPExpire = undefined;
+      await user.save();
+
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please request a new OTP",
+      });
+    }
+
+    // Verify OTP (case-insensitive comparison)
+    if (user.verificationOTP.toUpperCase() !== otp.toUpperCase()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP. Please check and try again",
+      });
+    }
+
+    // OTP verified successfully - clear it from database
+    user.verificationOTP = undefined;
+    user.verificationOTPExpire = undefined;
+    user.OTPstatus = "active"; // Mark OTP as verified
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      data: {
+        userId: user._id,
+        email: user.email,
+        mobile: user.mobile,
+        verified: true,
+      },
+    });
+  } catch (error) {
+    console.error("Verify OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while verifying OTP",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 🔐 RESET PASSWORD WITH OTP (After OTP Verification)
+// ==========================================
+
+export const resetPasswordWithOTP = async (req, res) => {
+  try {
+    const { userId, newPassword, confirmPassword } = req.body;
+
+    // Validation
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide userId",
+      });
+    }
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide newPassword and confirmPassword",
+      });
+    }
+
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId format",
+      });
+    }
+
+    // Find user by userId
+    const user = await User.findById(userId).select("+password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if OTP was verified (OTPstatus should be "active")
+    if (user.OTPstatus !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "OTP verification required. Please verify OTP first before changing password",
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.OTPstatus = "inactive"; // Reset OTP status after password change
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully. Please login with your new password",
+      data: {
+        userId: user._id,
+        email: user.email,
+        message: "You can now login with your new password",
+      },
+    });
+  } catch (error) {
+    console.error("Reset password with OTP error:", error);
+
+    // Handle specific MongoDB errors
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId format",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while resetting password",
+      error: error.message,
+    });
+  }
+};
