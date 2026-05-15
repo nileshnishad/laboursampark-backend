@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     mobile: String,
-
+    dob: Date,
     // User Type (Labour or Contractor)
     userType: String,
 

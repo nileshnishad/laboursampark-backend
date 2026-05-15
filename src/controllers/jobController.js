@@ -43,11 +43,11 @@ export const createJob = async (req, res) => {
     } = req.body;
 
     // Validation - Required fields
-    if (!workTitle || !description || !location || !workersNeeded || !target) {
+    if (!workTitle || !description || !location || !target) {
       return res.status(400).json({
         success: false,
         message:
-          "Please provide all required fields: workTitle, description, location, workersNeeded, target",
+          "Please provide all required fields: workTitle, description, location, target",
       });
     }
 
