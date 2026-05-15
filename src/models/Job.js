@@ -48,8 +48,8 @@ const jobSchema = new mongoose.Schema(
     // Job Requirements
     workersNeeded: {
       type: Number,
-      required: [true, "Please specify number of workers needed"],
-      min: 1,
+      min: 0,
+      default: 0,
     },
     requiredSkills: {
       type: [String],
