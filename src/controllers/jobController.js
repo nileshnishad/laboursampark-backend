@@ -39,6 +39,7 @@ export const createJob = async (req, res) => {
       category,
       priority,
       target,
+      workersNeeded // make optional
     } = req.body;
 
     // Validation - Required fields
@@ -149,7 +150,7 @@ export const createJob = async (req, res) => {
                 coordinates: [0, 0],
               },
             },
-      workersNeeded: parseInt(workersNeeded) || 0,
+      workersNeeded: workersNeeded !== undefined ? parseInt(workersNeeded) || 0 : 0,
       requiredSkills: requiredSkills || [],
       requiredDetails: requiredDetails || "",
       supportDocuments: supportDocuments || [],
