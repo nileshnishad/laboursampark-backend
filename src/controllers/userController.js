@@ -20,7 +20,7 @@ export const register = async (req, res) => {
   try {
 
 
-    const { fullName, email, password, mobile, userType } = req.body;
+    const { fullName, email, password, mobile, userType, dob } = req.body;
 
 
     // Validation
@@ -81,6 +81,7 @@ export const register = async (req, res) => {
       ...req.body,
       mobile: formattedMobile,
       userType: userType.toLowerCase(),
+      dob: dob ? new Date(dob) : undefined,
     };
 
     // Sanitize location coordinates if present
@@ -473,7 +474,11 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    const updateData = { ...req.body }; // Create copy to avoid mutating req.body
+    const updateData = { ...req.body };
+    // If dob is present, convert to Date
+    if (updateData.dob) {
+      updateData.dob = new Date(updateData.dob);
+    }
 
     // Fields that cannot be updated
     const restrictedFields = ["_id", "password", "email", "mobile", "createdAt", "resetPasswordToken", "resetPasswordExpire", "emailVerificationToken", "emailVerificationExpire"];
