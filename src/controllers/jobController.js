@@ -39,7 +39,8 @@ export const createJob = async (req, res) => {
       category,
       priority,
       target,
-      workersNeeded // make optional
+      workersNeeded, // make optional
+      businessTypes // add businessTypes
     } = req.body;
 
     // Validation - Required fields
@@ -168,6 +169,7 @@ export const createJob = async (req, res) => {
       createdByUserType: user.userType,
       status: "open",
       visibility: jobVisibility, // Use the determined visibility
+      businessTypes: Array.isArray(businessTypes) ? businessTypes : businessTypes ? [businessTypes] : [],
     };
 
     // Create and save job
@@ -503,6 +505,10 @@ export const updateJob = async (req, res) => {
     ];
 
     const updateData = { ...req.body };
+    // Ensure businessTypes is always an array if present
+    if (updateData.businessTypes && !Array.isArray(updateData.businessTypes)) {
+      updateData.businessTypes = [updateData.businessTypes];
+    }
 
     // Remove restricted fields
     restrictedFields.forEach((field) => {
