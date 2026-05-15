@@ -26,7 +26,6 @@ export const createJob = async (req, res) => {
       workTitle,
       description,
       location,
-      workersNeeded,
       requiredSkills,
       requiredDetails,
       supportDocuments,
@@ -47,7 +46,7 @@ export const createJob = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Please provide all required fields: workTitle, description, location, target",
+          "Please provide all required fields: workTitle, description, location, workersNeeded, target",
       });
     }
 
@@ -150,7 +149,7 @@ export const createJob = async (req, res) => {
                 coordinates: [0, 0],
               },
             },
-      workersNeeded: parseInt(workersNeeded),
+      workersNeeded: parseInt(workersNeeded) || 0,
       requiredSkills: requiredSkills || [],
       requiredDetails: requiredDetails || "",
       supportDocuments: supportDocuments || [],
