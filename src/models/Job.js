@@ -12,6 +12,21 @@ const jobSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please provide job description"],
     },
+    // Business Types (array of ObjectId or string)
+    businessTypes: {
+      type: [String],
+      default: [],
+    },
+    // Job Details
+    workTitle: {
+      type: String,
+      required: [true, "Please provide a work title"],
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: [true, "Please provide job description"],
+    },
 
     // Target Audience (auto-set based on createdBy userType)
     // Contractor → ["labour", "sub_contractor"]
@@ -43,6 +58,12 @@ const jobSchema = new mongoose.Schema(
           default: [0, 0],
         },
       },
+    },
+
+    // Business Types (array of ObjectId or string)
+    businessTypes: {
+      type: [String],
+      default: [],
     },
 
     // Job Requirements
