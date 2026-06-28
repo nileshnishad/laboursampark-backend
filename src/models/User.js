@@ -305,7 +305,6 @@ const userSchema = new mongoose.Schema(
 
 // Index for geospatial queries
 userSchema.index({ "location.coordinates": "2dsphere" });
-userSchema.index({ userCode: 1 }, { unique: true, sparse: true });
 
 // Validate and fix location coordinates before saving
 userSchema.pre("save", function () {
