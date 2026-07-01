@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import { authenticateToken, isAdmin } from "../middleware/authMiddleware.js";
 import {
   createPayUCheckoutLink,
   openPayUCheckout,
@@ -9,6 +9,7 @@ import {
   generatePayUHash,
   getPaymentStatus,
   getPaymentHistory,
+  getAllPayments,
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
@@ -27,5 +28,12 @@ router.post("/payu/hash", authenticateToken, generatePayUHash);
 
 router.get("/:paymentId/status", authenticateToken, getPaymentStatus);
 router.get("/history", authenticateToken, getPaymentHistory);
+
+// ==========================================
+// ADMIN ROUTES
+// ==========================================
+
+// GET /api/payments/admin/all - Get all payments with filters & pagination (ADMIN)
+router.get("/admin/all", authenticateToken, isAdmin, getAllPayments);
 
 export default router;

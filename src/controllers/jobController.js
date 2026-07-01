@@ -1896,3 +1896,60 @@ export const getAllJobsForApplicant = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// 👮 ADMIN — GET ALL JOBS
+// ==========================================
+
+export const getAllJobsAdmin = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search } = req.query;
+
+    const filter = {};
+
+    if (search && search.trim() !== "") {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { workTitle: { $regex: escapedSearch, $options: "i" } },
+        { description: { $regex: escapedSearch, $options: "i" } },
+        { "location.city": { $regex: escapedSearch, $options: "i" } },
+        { "location.state": { $regex: escapedSearch, $options: "i" } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [jobs, total] = await Promise.all([
+      Job.find(filter)
+        .populate("createdBy", "fullName email mobile userType userCode companyName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Job.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Jobs fetched successfully",
+      data: {
+        jobs,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("getAllJobsAdmin error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching jobs",
+      error: error.message,
+    });
+  }
+};

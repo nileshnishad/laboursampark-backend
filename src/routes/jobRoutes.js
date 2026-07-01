@@ -16,9 +16,10 @@ import {
   getAllAppliedJobs,
   getAllAcceptedJobs,
   getAllCompletedJobs,
+  getAllJobsAdmin,
 } from "../controllers/jobController.js";
 import { getJobStats } from "../controllers/jobStatsController.js";
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import { authenticateToken, isAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -93,5 +94,12 @@ router.post("/:jobId/complete", authenticateToken, completeJob);
 // TOGGLE JOB ACTIVATION
 // POST /api/jobs/:jobId/toggle-activation - Activate/Deactivate job (only by creator)
 router.post("/:jobId/toggle-activation", authenticateToken, toggleJobActivation);
+
+// ==========================================
+// ADMIN ROUTES
+// ==========================================
+
+// GET /api/jobs/admin/all - Get all jobs with pagination & search (ADMIN)
+router.get("/admin/all", authenticateToken, isAdmin, getAllJobsAdmin);
 
 export default router;

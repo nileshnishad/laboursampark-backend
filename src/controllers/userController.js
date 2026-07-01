@@ -1185,3 +1185,168 @@ export const resetPasswordWithOTP = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// 👮 ADMIN — GET ALL USERS
+// ==========================================
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+    } = req.query;
+
+    const filter = {};
+
+    // Search by name, email or mobile
+    if (search && search.trim() !== "") {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { fullName: { $regex: escapedSearch, $options: "i" } },
+        { email: { $regex: escapedSearch, $options: "i" } },
+        { mobile: { $regex: escapedSearch, $options: "i" } },
+        { userCode: { $regex: escapedSearch, $options: "i" } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select("-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken -emailVerificationExpire -verificationOTP -verificationOTPExpire -deviceTokens")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      data: {
+        users,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("getAllUsers error:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching users",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 👮 ADMIN — UPDATE ANY USER BY ID
+// ==========================================
+
+export const adminUpdateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    // Fields that must never be changed via this endpoint
+    const restrictedFields = [
+      "_id", "password", "resetPasswordToken", "resetPasswordExpire",
+      "emailVerificationToken", "emailVerificationExpire",
+      "verificationOTP", "verificationOTPExpire", "deviceTokens",
+    ];
+
+    const updates = { ...req.body };
+    restrictedFields.forEach((field) => delete updates[field]);
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided to update",
+      });
+    }
+
+    // Validate userType if being updated
+    if (updates.userType) {
+      const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin"];
+      if (!validUserTypes.includes(updates.userType.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid userType",
+        });
+      }
+      updates.userType = updates.userType.toLowerCase();
+    }
+
+    // Format mobile if being updated
+    if (updates.mobile && /^\d{10}$/.test(updates.mobile)) {
+      updates.mobile = "+91" + updates.mobile;
+    }
+
+    // Sanitize location coordinates if present
+    if (updates.location && updates.location.coordinates) {
+      if (!updates.location.coordinates.type || updates.location.coordinates.type === "") {
+        updates.location.coordinates.type = "Point";
+      }
+      if (!Array.isArray(updates.location.coordinates.coordinates)) {
+        updates.location.coordinates.coordinates = [0, 0];
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken -emailVerificationExpire -verificationOTP -verificationOTPExpire -deviceTokens");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: { user },
+    });
+  } catch (error) {
+    console.error("adminUpdateUser error:", error);
+
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Email or mobile number already in use by another user",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while updating user",
+      error: error.message,
+    });
+  }
+};
