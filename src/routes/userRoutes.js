@@ -1,7 +1,7 @@
 import express from "express";
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP } from "../controllers/userController.js";
+import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP, getAllUsers, adminUpdateUser } from "../controllers/userController.js";
 import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
-import { authenticateToken, publicEndpoint } from "../middleware/authMiddleware.js";
+import { authenticateToken, publicEndpoint, isAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -60,5 +60,15 @@ router.post("/config-check", authenticateToken, configCheck);
 
 // GET /api/users/visible - Get visible users (contractors/labour) (PROTECTED)
 router.get("/visible", authenticateToken, getVisibleUsers);
+
+// ==========================================
+// ADMIN ROUTES (admin/super_admin only)
+// ==========================================
+
+// GET /api/users/admin/all - Get all users with optional filters & pagination (ADMIN)
+router.get("/admin/all", authenticateToken, isAdmin, getAllUsers);
+
+// POST /api/users/admin/update/:id - Update any user by ID (ADMIN)
+router.post("/admin/update/:id", authenticateToken, isAdmin, adminUpdateUser);
 
 export default router;

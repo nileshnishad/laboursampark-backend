@@ -820,6 +820,81 @@ export const initPayUMobilePayment = async (req, res) => {
   }
 };
 
+// ==========================================
+// 👮 ADMIN — GET ALL PAYMENTS
+// ==========================================
+
+export const getAllPayments = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+    } = req.query;
+
+    const filter = {};
+
+    // Search by txnId or receipt
+    if (search && search.trim() !== "") {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { txnId: { $regex: escapedSearch, $options: "i" } },
+        { receipt: { $regex: escapedSearch, $options: "i" } },
+        { "customer.email": { $regex: escapedSearch, $options: "i" } },
+        { "customer.phone": { $regex: escapedSearch, $options: "i" } },
+        { productInfo: { $regex: escapedSearch, $options: "i" } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [payments, total] = await Promise.all([
+      Payment.find(filter)
+        .populate("userId", "fullName email mobile userType userCode")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Payment.countDocuments(filter),
+    ]);
+
+    // Summary counts per status
+    const statusSummary = await Payment.aggregate([
+      { $match: filter },
+      { $group: { _id: "$status", count: { $sum: 1 }, totalAmount: { $sum: "$amount" } } },
+    ]);
+
+    const summary = {};
+    statusSummary.forEach(({ _id, count, totalAmount }) => {
+      summary[_id] = { count, totalAmount };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Payments fetched successfully",
+      data: {
+        payments,
+        summary,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("getAllPayments error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching payments",
+      error: error.message,
+    });
+  }
+};
+
 export const getPaymentHistory = async (req, res) => {
   try {
     const userId = req.userId;
