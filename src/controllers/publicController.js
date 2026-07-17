@@ -9,6 +9,18 @@ import Document from '../models/Document.js';
 import Payment from '../models/Payment.js';
 import Notification from '../models/Notification.js';
 import JobEnquiry from '../models/JobEnquiry.js';
+import MobileBanner from '../models/MobileBanner.js';
+
+const formatMobileBanner = (banner) => ({
+  ...banner,
+  createdByName: banner.createdBy?.fullName || null,
+  updatedByName: banner.updatedBy?.fullName || null,
+});
+
+const hasAdminAccess = (req) => {
+  const userType = req.user?.userType;
+  return userType === 'admin' || userType === 'super_admin';
+};
 
 
 export const getSkills = async (req, res) => {
@@ -488,5 +500,223 @@ export const getDashboardStats = async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch dashboard stats' });
+  }
+};
+
+export const createMobileBanner = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { title, bannerImageUrl, link, context, visible } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!hasAdminAccess(req)) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    const normalizedTitle = String(title || '').trim();
+    const normalizedBannerImageUrl = String(bannerImageUrl || '').trim();
+    const normalizedLink = String(link || '').trim();
+    const normalizedContext = String(context || '').trim();
+
+    if (!normalizedTitle) {
+      return res.status(400).json({ success: false, message: 'title is required' });
+    }
+
+    if (!normalizedBannerImageUrl) {
+      return res.status(400).json({ success: false, message: 'bannerImageUrl is required' });
+    }
+
+    if (!normalizedLink) {
+      return res.status(400).json({ success: false, message: 'link is required' });
+    }
+
+    const mobileBanner = new MobileBanner({
+      title: normalizedTitle,
+      bannerImageUrl: normalizedBannerImageUrl,
+      link: normalizedLink,
+      context: normalizedContext,
+      visible: visible === true || visible === 'true' || visible === 1 || visible === '1',
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    await mobileBanner.save();
+
+    if (mobileBanner.visible) {
+      await MobileBanner.updateMany(
+        { _id: { $ne: mobileBanner._id } },
+        { $set: { visible: false } },
+      );
+    }
+
+    const savedBanner = await MobileBanner.findById(mobileBanner._id)
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Mobile banner created successfully',
+      banner: formatMobileBanner(savedBanner),
+    });
+  } catch (error) {
+    console.error('Error creating mobile banner:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create mobile banner' });
+  }
+};
+
+export const updateMobileBanner = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { bannerId } = req.params;
+    const { title, bannerImageUrl, link, context, visible } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!hasAdminAccess(req)) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    if (!bannerId) {
+      return res.status(400).json({ success: false, message: 'bannerId is required' });
+    }
+
+    const existingBanner = await MobileBanner.findById(bannerId);
+    if (!existingBanner) {
+      return res.status(404).json({ success: false, message: 'Mobile banner not found' });
+    }
+
+    const updatePayload = { updatedBy: userId };
+
+    if (title !== undefined) {
+      const normalizedTitle = String(title || '').trim();
+      if (!normalizedTitle) {
+        return res.status(400).json({ success: false, message: 'title cannot be empty' });
+      }
+      updatePayload.title = normalizedTitle;
+    }
+
+    if (bannerImageUrl !== undefined) {
+      const normalizedBannerImageUrl = String(bannerImageUrl || '').trim();
+      if (!normalizedBannerImageUrl) {
+        return res.status(400).json({ success: false, message: 'bannerImageUrl cannot be empty' });
+      }
+      updatePayload.bannerImageUrl = normalizedBannerImageUrl;
+    }
+
+    if (link !== undefined) {
+      const normalizedLink = String(link || '').trim();
+      if (!normalizedLink) {
+        return res.status(400).json({ success: false, message: 'link cannot be empty' });
+      }
+      updatePayload.link = normalizedLink;
+    }
+
+    if (context !== undefined) {
+      updatePayload.context = String(context || '').trim();
+    }
+
+    if (visible !== undefined) {
+      updatePayload.visible = visible === true || visible === 'true' || visible === 1 || visible === '1';
+    }
+
+    const updatedBanner = await MobileBanner.findByIdAndUpdate(bannerId, updatePayload, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    if (updatedBanner.visible) {
+      await MobileBanner.updateMany(
+        { _id: { $ne: updatedBanner._id } },
+        { $set: { visible: false } },
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: 'Mobile banner updated successfully',
+      banner: formatMobileBanner(updatedBanner),
+    });
+  } catch (error) {
+    console.error('Error updating mobile banner:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update mobile banner' });
+  }
+};
+
+export const getActiveMobileBanner = async (req, res) => {
+  try {
+    const banner = await MobileBanner.findOne({ visible: true })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      banner: banner || null,
+      hasBanner: Boolean(banner),
+    });
+  } catch (error) {
+    console.error('Error fetching active mobile banner:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch active mobile banner' });
+  }
+};
+
+export const getAllMobileBanners = async (req, res) => {
+  try {
+    const banners = await MobileBanner.find({})
+      .sort({ visible: -1, updatedAt: -1, createdAt: -1 })
+      .populate('createdBy', 'fullName')
+      .populate('updatedBy', 'fullName')
+      .lean();
+
+    return res.json({
+      success: true,
+      total: banners.length,
+      banners: banners.map(formatMobileBanner),
+    });
+  } catch (error) {
+    console.error('Error fetching mobile banners:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch mobile banners' });
+  }
+};
+
+export const deleteMobileBanner = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { bannerId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!hasAdminAccess(req)) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    if (!bannerId) {
+      return res.status(400).json({ success: false, message: 'bannerId is required' });
+    }
+
+    const deletedBanner = await MobileBanner.findByIdAndDelete(bannerId).lean();
+
+    if (!deletedBanner) {
+      return res.status(404).json({ success: false, message: 'Mobile banner not found' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Mobile banner deleted successfully',
+      deletedBanner,
+    });
+  } catch (error) {
+    console.error('Error deleting mobile banner:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete mobile banner' });
   }
 };
