@@ -1605,3 +1605,48 @@ export const submitFeedback = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// ⭐ SUBMIT FEEDBACK BY JOB ID (worker -> job creator)
+// POST /api/jobs/:jobId/submitfeedback
+// Resolves the caller's completed enquiry for the given job and reuses submitFeedback logic.
+// ==========================================
+
+export const submitFeedbackByJobId = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { jobId } = req.params;
+
+    if (!jobId || !jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid job ID format",
+      });
+    }
+
+    const enquiry = await JobEnquiry.findOne({
+      jobId,
+      userId,
+      status: "completed",
+    })
+      .select("_id status")
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    if (!enquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Completed application not found for this job and user",
+      });
+    }
+
+    req.params.enquiryId = enquiry._id.toString();
+    return submitFeedback(req, res);
+  } catch (error) {
+    console.error("submitFeedbackByJobId error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit feedback",
+      error: error.message,
+    });
+  }
+};
