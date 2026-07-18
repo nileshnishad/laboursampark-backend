@@ -17,7 +17,7 @@ import {
   getAllCompletedJobs,
   getAllJobsAdmin,
 } from "../controllers/jobController.js";
-import { createEnquiry } from "../controllers/jobEnquiryController.js";
+import { createEnquiry, submitFeedbackByJobId } from "../controllers/jobEnquiryController.js";
 import { getJobStats } from "../controllers/jobStatsController.js";
 import { authenticateToken, isAdmin } from "../middleware/authMiddleware.js";
 
@@ -78,6 +78,10 @@ router.delete("/:jobId", authenticateToken, deleteJob);
 // APPLY TO JOB
 // POST /api/jobs/:jobId/apply - Apply/Show interest in job
 router.post("/:jobId/apply", authenticateToken, createEnquiry);
+
+// SUBMIT FEEDBACK (labour/sub_contractor -> job creator) by jobId
+// POST /api/jobs/:jobId/submitfeedback
+router.post("/:jobId/submitfeedback", authenticateToken, submitFeedbackByJobId);
 
 // GET JOB APPLICATIONS
 // GET /api/jobs/:jobId/applications - Get all applications for job (only by creator)
