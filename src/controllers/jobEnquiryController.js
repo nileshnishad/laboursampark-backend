@@ -1208,10 +1208,10 @@ export const completeApplication = async (req, res) => {
         message: "rating is required and must be between 1 and 5",
       });
     }
-    if (!feedback || String(feedback).trim().length < 10) {
+    if (!feedback || !String(feedback).trim()) {
       return res.status(400).json({
         success: false,
-        message: "feedback is required and must be at least 10 characters",
+        message: "feedback is required",
       });
     }
 
@@ -1444,10 +1444,10 @@ export const submitFeedback = async (req, res) => {
         message: "rating is required and must be between 1 and 5",
       });
     }
-    if (!feedback || String(feedback).trim().length < 10) {
+    if (!feedback || !String(feedback).trim()) {
       return res.status(400).json({
         success: false,
-        message: "feedback is required and must be at least 10 characters",
+        message: "feedback is required",
       });
     }
 
