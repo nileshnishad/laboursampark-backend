@@ -28,10 +28,10 @@ export const submitUserReview = async (req, res) => {
       });
     }
 
-    if (!feedback || feedback.length < 10) {
+    if (!feedback || !String(feedback).trim()) {
       return res.status(400).json({
         success: false,
-        message: "Feedback must be at least 10 characters long",
+        message: "Feedback is required",
       });
     }
 
