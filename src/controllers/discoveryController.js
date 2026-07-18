@@ -20,9 +20,14 @@ const extractExperienceYears = (value) => {
   const text = String(value).trim();
   if (!text) return null;
 
-  const rangeMatch = text.match(/(\d+(?:\.\d+)?)\s*[-to+–]\s*(\d+(?:\.\d+)?)/i);
+  const rangeMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:-|to|–|\+)?\s*(\d+(?:\.\d+)?)/i);
   if (rangeMatch) {
     return Number.parseFloat(rangeMatch[1]);
+  }
+
+  const yearsMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:\+|years?|yrs?|yr|y)/i);
+  if (yearsMatch) {
+    return Number.parseFloat(yearsMatch[1]);
   }
 
   const numericMatch = text.match(/\d+(?:\.\d+)?/);
@@ -254,6 +259,8 @@ export const getLabours = async (req, res) => {
       page = 1,
       limit = 20,
       search,
+      name,
+      mobile,
       skills,
       skillIds,
       state,
@@ -301,6 +308,7 @@ export const getLabours = async (req, res) => {
       filter.$and.push({
         $or: [
           { fullName: searchPattern },
+          { mobile: searchPattern },
           { bio: searchPattern },
           { about: searchPattern },
           { experience: searchPattern },
@@ -312,8 +320,24 @@ export const getLabours = async (req, res) => {
           { coverageArea: searchPattern },
           { workTypes: searchPattern },
           { businessName: searchPattern },
+          { companyName: searchPattern },
         ],
       });
+    }
+
+    if (name) {
+      const namePattern = new RegExp(escapeRegex(String(name).trim()), "i");
+      filter.$and.push({
+        $or: [
+          { fullName: namePattern },
+          { businessName: namePattern },
+          { companyName: namePattern },
+        ],
+      });
+    }
+
+    if (mobile) {
+      filter.mobile = { $regex: escapeRegex(String(mobile).trim()), $options: "i" };
     }
 
     if (state) {
