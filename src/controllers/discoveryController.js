@@ -60,6 +60,29 @@ const buildSkillTerms = async (skillIds) => {
   return [...new Set([...rawTerms, ...resolvedTerms].map((term) => String(term).trim()).filter(Boolean))];
 };
 
+const buildFlexibleRegex = (value) => {
+  const tokens = String(value)
+    .trim()
+    .split(/\s+/)
+    .map((token) => escapeRegex(token))
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  return new RegExp(tokens.join(".*"), "i");
+};
+
+const buildSkillMatchConditions = (skillsList) => {
+  const uniqueSkills = [...new Set(parseListParam(skillsList))];
+
+  return uniqueSkills
+    .map((skill) => buildFlexibleRegex(skill))
+    .filter(Boolean)
+    .map((pattern) => ({ skills: pattern }));
+};
+
 const buildLabourResponse = (userData) => {
   const experienceYears = extractExperienceYears(userData.experienceRange ?? userData.experience);
 
@@ -300,7 +323,12 @@ export const getLabours = async (req, res) => {
     };
 
     if (requestedSkills.length > 0) {
-      filter.skills = { $in: requestedSkills };
+      const skillConditions = buildSkillMatchConditions(requestedSkills);
+      if (skillConditions.length === 1) {
+        filter.$and.push(skillConditions[0]);
+      } else if (skillConditions.length > 1) {
+        filter.$and.push({ $or: skillConditions });
+      }
     }
 
     if (search) {
