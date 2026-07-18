@@ -1,10 +1,11 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 // ==========================================
 // 🔐 AUTHENTICATION MIDDLEWARE
 // ==========================================
 
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers["authorization"];
@@ -42,12 +43,37 @@ export const authenticateToken = (req, res, next) => {
       });
     }
 
+    // Validate active session
+    const user = await User.findById(decoded.userId).select("activeSessionId isLoggedIn status");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found. Please login again.",
+      });
+    }
+
+    if (!decoded.sessionId || !user.isLoggedIn || !user.activeSessionId) {
+      return res.status(401).json({
+        success: false,
+        message: "Session is logged out or expired. Please login again.",
+      });
+    }
+
+    if (decoded.sessionId !== user.activeSessionId) {
+      return res.status(401).json({
+        success: false,
+        message: "This session is no longer active. Please login again.",
+      });
+    }
+
     // Attach user info to request object
     req.user = {
       userId: decoded.userId,
       email: decoded.email || null,
       mobile: decoded.mobile || null,
       userType: decoded.userType || null,
+      sessionId: decoded.sessionId || null,
     };
 
     req.userId = decoded.userId; // Easy access to userId

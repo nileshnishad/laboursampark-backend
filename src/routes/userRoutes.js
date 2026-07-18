@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP, getAllUsers, adminUpdateUser } from "../controllers/userController.js";
+import { register, login, logout, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP, getAllUsers, adminUpdateUser } from "../controllers/userController.js";
 import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint, isAdmin } from "../middleware/authMiddleware.js";
 
@@ -54,6 +54,9 @@ router.patch("/profile", authenticateToken, updateProfile);
 
 // POST /api/users/change-password - Change password for authenticated user (PROTECTED)
 router.post("/change-password", authenticateToken, changePassword);
+
+// POST /api/users/logout - Logout authenticated user (PROTECTED)
+router.post("/logout", authenticateToken, logout);
 
 // POST /api/users/config-check - Validate app config and save FCM token (PROTECTED)
 router.post("/config-check", authenticateToken, configCheck);

@@ -141,6 +141,16 @@ const userSchema = new mongoose.Schema(
 
     // Device & Login Info
     lastLogin: Date,
+    lastLogoutAt: Date,
+    isLoggedIn: {
+      type: Boolean,
+      default: false,
+    },
+    activeSessionId: {
+      type: String,
+      default: null,
+    },
+    sessionStartedAt: Date,
     deviceTokens: [String],
 
     // Metadata
@@ -350,6 +360,7 @@ userSchema.methods.toJSON = function () {
   delete user.emailVerificationExpire;
   delete user.verificationOTP;
   delete user.verificationOTPExpire;
+  delete user.activeSessionId;
   return user;
 };
 

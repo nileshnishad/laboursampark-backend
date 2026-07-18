@@ -233,20 +233,30 @@ export const login = async (req, res) => {
       await user.save();
     }
 
-    // Generate JWT token with userType included
+    // Generate session-bound JWT token
+    const sessionId = crypto.randomUUID();
     const token = jwt.sign(
       {
         userId: user._id,
         email: user.email,
         mobile: user.mobile,
         userType: user.userType,
+        sessionId,
       },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "7d" }
+      process.env.JWT_SECRET || "your-secret-key"
     );
 
-    // Update last login
-    user.lastLogin = new Date();
+    // Rotate session: previous session (if any) becomes invalid automatically.
+    const now = new Date();
+    if (user.isLoggedIn && user.activeSessionId) {
+      user.lastLogoutAt = now;
+    }
+
+    // Update login/session details
+    user.lastLogin = now;
+    user.isLoggedIn = true;
+    user.activeSessionId = sessionId;
+    user.sessionStartedAt = now;
     await user.save();
 
     // Prepare comprehensive user data
@@ -381,6 +391,39 @@ export const login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred during login",
+      error: error.message,
+    });
+  }
+};
+
+// Logout User
+export const logout = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login first.",
+      });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      isLoggedIn: false,
+      activeSessionId: null,
+      sessionStartedAt: null,
+      lastLogoutAt: new Date(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logout successful",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred during logout",
       error: error.message,
     });
   }
