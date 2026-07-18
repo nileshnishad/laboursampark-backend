@@ -2,6 +2,7 @@ import Job from "../models/Job.js";
 import JobEnquiry from "../models/JobEnquiry.js";
 import User from "../models/User.js";
 import UserJobHistory from "../models/UserJobHistory.js";
+import UserReview from "../models/UserReview.js";
 import { logActivity } from "../utils/activityLogger.js";
 import { contractorJobCreatedSms, subContractorJobCreatedSms } from "../utils/twilio/templates/smsTemplates.js";
 import { sendTwilioSms } from "../utils/twilio/verifyService.js";
@@ -1198,40 +1199,98 @@ export const getApplicationsForJob = async (req, res) => {
       JobEnquiry.countDocuments({ jobId, status: "withdrawn" }),
     ]);
 
+    // Fetch bidirectional ratings for listed applicants
+    const applicantIds = applications
+      .filter((enq) => enq.userId?._id)
+      .map((enq) => enq.userId._id);
+
+    const [contractorReviews, applicantReviews] = applicantIds.length > 0
+      ? await Promise.all([
+          UserReview.find({
+            jobId,
+            reviewedBy: userId,
+            userId: { $in: applicantIds },
+            reviewType: "contractor_review",
+          }).select("_id userId rating feedback ratingDetails createdAt"),
+          UserReview.find({
+            jobId,
+            reviewedBy: { $in: applicantIds },
+            userId,
+            reviewType: "worker_review",
+          }).select("_id reviewedBy rating feedback ratingDetails createdAt"),
+        ])
+      : [[], []];
+
+    const contractorReviewByApplicant = new Map(
+      contractorReviews.map((review) => [review.userId.toString(), review])
+    );
+
+    const applicantReviewByApplicant = new Map(
+      applicantReviews.map((review) => [review.reviewedBy.toString(), review])
+    );
+
     // Shape each application for clean response
-    const applicationList = applications.map((enq) => ({
-      enquiryId:       enq._id,
-      status:          enq.status,
-      message:         enq.message,
-      appliedAt:       enq.createdAt,
-      acceptedAt:      enq.acceptedAt  || null,
-      rejectedAt:      enq.rejectedAt  || null,
-      rejectionReason: enq.rejectionReason || null,
-      notes:           enq.notes || null,
-      applicant: enq.userId
-        ? {
-            userId:        enq.userId._id,
-            name:          enq.userId.fullName,
-            email:         enq.userId.email,
-            mobile:        enq.userId.mobile,
-            profilePhoto:  enq.userId.profilePhotoUrl || null,
-            userType:      enq.userId.userType,
-            rating:        enq.userId.rating,
-            totalReviews:  enq.userId.totalReviews,
-            skills:        enq.userId.skills || [],
-            experience:    enq.userId.experience || null,
-            completedJobs: enq.userId.completedJobs,
-            availability:  enq.userId.availability,
-            location: enq.userId.location
-              ? {
-                  city:  enq.userId.location.city,
-                  state: enq.userId.location.state,
-                  area:  enq.userId.location.area,
-                }
-              : null,
-          }
-        : enq.userDetails, // fallback to snapshot if user deleted
-    }));
+    const applicationList = applications.map((enq) => {
+      const applicantId = enq.userId?._id?.toString() || null;
+      const contractorReview = applicantId
+        ? contractorReviewByApplicant.get(applicantId)
+        : null;
+      const applicantReview = applicantId
+        ? applicantReviewByApplicant.get(applicantId)
+        : null;
+
+      return {
+        enquiryId:       enq._id,
+        status:          enq.status,
+        message:         enq.message,
+        appliedAt:       enq.createdAt,
+        acceptedAt:      enq.acceptedAt  || null,
+        rejectedAt:      enq.rejectedAt  || null,
+        rejectionReason: enq.rejectionReason || null,
+        notes:           enq.notes || null,
+        applicant: enq.userId
+          ? {
+              userId:        enq.userId._id,
+              name:          enq.userId.fullName,
+              email:         enq.userId.email,
+              mobile:        enq.userId.mobile,
+              profilePhoto:  enq.userId.profilePhotoUrl || null,
+              userType:      enq.userId.userType,
+              rating:        enq.userId.rating,
+              totalReviews:  enq.userId.totalReviews,
+              skills:        enq.userId.skills || [],
+              experience:    enq.userId.experience || null,
+              completedJobs: enq.userId.completedJobs,
+              availability:  enq.userId.availability,
+              location: enq.userId.location
+                ? {
+                    city:  enq.userId.location.city,
+                    state: enq.userId.location.state,
+                    area:  enq.userId.location.area,
+                  }
+                : null,
+            }
+          : enq.userDetails, // fallback to snapshot if user deleted
+        contractorReviewToApplicant: contractorReview
+          ? {
+              reviewId: contractorReview._id,
+              rating: contractorReview.rating,
+              feedback: contractorReview.feedback,
+              ratingDetails: contractorReview.ratingDetails || {},
+              reviewedAt: contractorReview.createdAt,
+            }
+          : null,
+        applicantReviewToContractor: applicantReview
+          ? {
+              reviewId: applicantReview._id,
+              rating: applicantReview.rating,
+              feedback: applicantReview.feedback,
+              ratingDetails: applicantReview.ratingDetails || {},
+              reviewedAt: applicantReview.createdAt,
+            }
+          : null,
+      };
+    });
 
     return res.status(200).json({
       success: true,
