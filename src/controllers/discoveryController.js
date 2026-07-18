@@ -47,6 +47,7 @@ const buildSkillTerms = async (skillIds) => {
 
   const objectIds = skillTerms.filter((term) => mongoose.Types.ObjectId.isValid(term));
   const rawTerms = skillTerms.filter((term) => !mongoose.Types.ObjectId.isValid(term));
+  const objectIdStrings = objectIds.map((id) => String(id));
 
   let resolvedTerms = [];
   if (objectIds.length > 0) {
@@ -57,7 +58,7 @@ const buildSkillTerms = async (skillIds) => {
     resolvedTerms = matchedSkills.flatMap((skill) => [skill.enName, skill.name, skill.hiName, skill.mrName]);
   }
 
-  return [...new Set([...rawTerms, ...resolvedTerms].map((term) => String(term).trim()).filter(Boolean))];
+  return [...new Set([...rawTerms, ...objectIdStrings, ...resolvedTerms].map((term) => String(term).trim()).filter(Boolean))];
 };
 
 const buildFlexibleRegex = (value) => {
