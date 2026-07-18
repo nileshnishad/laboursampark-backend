@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import Skills from "../models/Skills.js";
+import BusinessName from "../models/BusinessName.js";
 
 const parseListParam = (value) => {
   if (!value) return [];
@@ -61,6 +62,29 @@ const buildSkillTerms = async (skillIds) => {
   return [...new Set([...rawTerms, ...objectIdStrings, ...resolvedTerms].map((term) => String(term).trim()).filter(Boolean))];
 };
 
+const buildBusinessTypeTerms = async (businessTypeIds) => {
+  const typeTerms = parseListParam(businessTypeIds);
+
+  if (typeTerms.length === 0) {
+    return [];
+  }
+
+  const objectIds = typeTerms.filter((term) => mongoose.Types.ObjectId.isValid(term));
+  const rawTerms = typeTerms.filter((term) => !mongoose.Types.ObjectId.isValid(term));
+  const objectIdStrings = objectIds.map((id) => String(id));
+
+  let resolvedTerms = [];
+  if (objectIds.length > 0) {
+    const matchedTypes = await BusinessName.find({ _id: { $in: objectIds } })
+      .select("enName name hiName mrName")
+      .lean();
+
+    resolvedTerms = matchedTypes.flatMap((type) => [type.enName, type.name, type.hiName, type.mrName]);
+  }
+
+  return [...new Set([...rawTerms, ...objectIdStrings, ...resolvedTerms].map((term) => String(term).trim()).filter(Boolean))];
+};
+
 const buildFlexibleRegex = (value) => {
   const tokens = String(value)
     .trim()
@@ -82,6 +106,15 @@ const buildSkillMatchConditions = (skillsList) => {
     .map((skill) => buildFlexibleRegex(skill))
     .filter(Boolean)
     .map((pattern) => ({ skills: pattern }));
+};
+
+const buildArrayFieldMatchConditions = (fieldName, values) => {
+  const uniqueValues = [...new Set(parseListParam(values))];
+
+  return uniqueValues
+    .map((value) => buildFlexibleRegex(value))
+    .filter(Boolean)
+    .map((pattern) => ({ [fieldName]: pattern }));
 };
 
 const buildLabourResponse = (userData) => {
@@ -461,60 +494,160 @@ export const getLabours = async (req, res) => {
 
 export const getContractors = async (req, res) => {
   try {
-    const { page = 1, limit = 20, skills, location, rating, minRate, maxRate } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      name,
+      mobile,
+      skills,
+      skillIds,
+      businessTypes,
+      businessTypeIds,
+      state,
+      city,
+      area,
+      location,
+      rating,
+      minRating,
+      minExperience,
+      minRate,
+      maxRate,
+    } = req.query;
     const now = new Date();
+    const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
+    const skip = (parsedPage - 1) * parsedLimit;
+    const minimumRating = minRating ?? rating;
+    const minimumExperience = minExperience !== undefined && minExperience !== null && String(minExperience).trim() !== ""
+      ? Number.parseFloat(minExperience)
+      : null;
+    const requestedSkills = [...parseListParam(skills), ...(await buildSkillTerms(skillIds))];
+    const requestedBusinessTypes = [...parseListParam(businessTypes), ...(await buildBusinessTypeTerms(businessTypeIds))];
 
     console.log("Fetching contractor users...");
 
-    // Build filter: contractor users with display=true
     const filter = {
-      userType: ["contractor","sub_contractor"], // Show both contractors and sub-contractors
+      userType: { $in: ["contractor", "sub_contractor"] },
       display: true,
-      $or: [{ displayExpiresAt: { $exists: false } }, { displayExpiresAt: null }, { displayExpiresAt: { $gte: now } }],
+      $and: [
+        {
+          $or: [
+            { displayExpiresAt: { $exists: false } },
+            { displayExpiresAt: null },
+            { displayExpiresAt: { $gte: now } },
+          ],
+        },
+      ],
     };
 
-    // Optional filters
-    if (skills) {
-      const skillsArray = skills.split(",").map(s => s.trim());
-      filter.skills = { $in: skillsArray };
+    if (requestedSkills.length > 0) {
+      const skillConditions = buildSkillMatchConditions(requestedSkills);
+      if (skillConditions.length === 1) {
+        filter.$and.push(skillConditions[0]);
+      } else if (skillConditions.length > 1) {
+        filter.$and.push({ $or: skillConditions });
+      }
     }
 
-    if (location) {
-      filter["location.city"] = { $regex: location, $options: "i" };
+    if (requestedBusinessTypes.length > 0) {
+      const businessTypeConditions = buildArrayFieldMatchConditions("businessTypes", requestedBusinessTypes);
+      if (businessTypeConditions.length === 1) {
+        filter.$and.push(businessTypeConditions[0]);
+      } else if (businessTypeConditions.length > 1) {
+        filter.$and.push({ $or: businessTypeConditions });
+      }
     }
 
-    if (rating) {
-      filter.rating = { $gte: parseFloat(rating) };
+    if (search) {
+      const searchPattern = new RegExp(escapeRegex(String(search).trim()), "i");
+      filter.$and.push({
+        $or: [
+          { fullName: searchPattern },
+          { mobile: searchPattern },
+          { bio: searchPattern },
+          { about: searchPattern },
+          { experience: searchPattern },
+          { experienceRange: searchPattern },
+          { skills: searchPattern },
+          { businessTypes: searchPattern },
+          { businessName: searchPattern },
+          { companyName: searchPattern },
+          { "location.city": searchPattern },
+          { "location.state": searchPattern },
+          { "location.area": searchPattern },
+          { coverageArea: searchPattern },
+          { workTypes: searchPattern },
+        ],
+      });
     }
 
-    // Filter by rate range
+    if (name) {
+      const namePattern = new RegExp(escapeRegex(String(name).trim()), "i");
+      filter.$and.push({
+        $or: [
+          { fullName: namePattern },
+          { businessName: namePattern },
+          { companyName: namePattern },
+        ],
+      });
+    }
+
+    if (mobile) {
+      filter.mobile = { $regex: escapeRegex(String(mobile).trim()), $options: "i" };
+    }
+
+    if (state) {
+      filter["location.state"] = { $regex: escapeRegex(String(state).trim()), $options: "i" };
+    }
+
+    if (city) {
+      filter["location.city"] = { $regex: escapeRegex(String(city).trim()), $options: "i" };
+    }
+
+    if (area) {
+      filter["location.area"] = { $regex: escapeRegex(String(area).trim()), $options: "i" };
+    }
+
+    if (location && !city) {
+      filter["location.city"] = { $regex: escapeRegex(String(location).trim()), $options: "i" };
+    }
+
+    if (minimumRating !== undefined && minimumRating !== null && String(minimumRating).trim() !== "") {
+      filter.rating = { $gte: Number.parseFloat(minimumRating) };
+    }
+
     if (minRate || maxRate) {
       const rateFilter = {};
-      if (minRate) rateFilter.$gte = parseFloat(minRate);
-      if (maxRate) rateFilter.$lte = parseFloat(maxRate);
-      
-      filter.$or = [
-        { hourlyRate: rateFilter },
-        { dayRate: rateFilter },
-      ];
+      if (minRate) rateFilter.$gte = Number.parseFloat(minRate);
+      if (maxRate) rateFilter.$lte = Number.parseFloat(maxRate);
+
+      filter.$and.push({
+        $or: [
+          { hourlyRate: rateFilter },
+          { dayRate: rateFilter },
+          { projectRate: rateFilter },
+        ],
+      });
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // Get contractor users
-    const users = await User.find(filter)
+    const baseQuery = User.find(filter)
       .select("-password -emailVerificationToken -resetPasswordToken")
-      .sort({ rating: -1, totalReviews: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+      .sort({ rating: -1, totalReviews: -1, completedJobs: -1, fullName: 1 });
 
-    // Get total count
-    const total = await User.countDocuments(filter);
+    let users = await baseQuery.lean();
 
-    // Format response data
-    const formattedUsers = users.map(user => {
-      const userData = user.toJSON();
+    if (minimumExperience !== null && !Number.isNaN(minimumExperience)) {
+      users = users.filter((user) => {
+        const years = extractExperienceYears(user.experienceRange ?? user.experience);
+        return years !== null && years >= minimumExperience;
+      });
+    }
+
+    const total = users.length;
+    const paginatedUsers = users.slice(skip, skip + parsedLimit);
+
+    const formattedUsers = paginatedUsers.map((userData) => {
       return {
         _id: userData._id,
         fullName: userData.fullName,
@@ -556,10 +689,22 @@ export const getContractors = async (req, res) => {
       data: {
         users: formattedUsers,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: parsedPage,
+          limit: parsedLimit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit)),
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+        filters: {
+          search: search || null,
+          skills: requestedSkills,
+          businessTypes: requestedBusinessTypes,
+          state: state || null,
+          city: city || location || null,
+          area: area || null,
+          minRating: minimumRating !== undefined && minimumRating !== null ? Number.parseFloat(minimumRating) : null,
+          minExperience: minimumExperience,
+          minRate: minRate || null,
+          maxRate: maxRate || null,
         },
       },
     });
