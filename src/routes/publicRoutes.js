@@ -1,6 +1,7 @@
 import  express from 'express';
 
 import { getSkills, getAllSkills, getAllSkillsName, addSkills, updateSkill, getAllBusinessName, addBusinessName, updateBusinessName, getDashboardStats, createMobileBanner, updateMobileBanner, getActiveMobileBanner, getAllMobileBanners, deleteMobileBanner } from '../controllers/publicController.js';
+import { checkAppVersion, createOrUpdateAppVersion } from '../controllers/appVersionController.js';
 import { authenticateToken, isAdmin } from '../middleware/authMiddleware.js';
 
 
@@ -20,5 +21,7 @@ router.get('/mobile-banner/admin/all', authenticateToken, isAdmin, getAllMobileB
 router.post('/mobile-banner', authenticateToken, isAdmin, createMobileBanner);
 router.put('/mobile-banner/:bannerId', authenticateToken, isAdmin, updateMobileBanner);
 router.delete('/mobile-banner/:bannerId', authenticateToken, isAdmin, deleteMobileBanner);
+router.post('/app/version-check', checkAppVersion);
+router.post('/app/version-config', authenticateToken, isAdmin, createOrUpdateAppVersion);
 
 export default router;
