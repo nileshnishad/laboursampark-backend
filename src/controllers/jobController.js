@@ -6,6 +6,7 @@ import UserReview from "../models/UserReview.js";
 import { logActivity } from "../utils/activityLogger.js";
 import { contractorJobCreatedSms, subContractorJobCreatedSms } from "../utils/twilio/templates/smsTemplates.js";
 import { sendTwilioSms } from "../utils/twilio/verifyService.js";
+import { sendJobCreatedNotifications } from "../utils/jobNotificationService.js";
 
 // ==========================================
 // 📋 CREATE JOB
@@ -196,6 +197,15 @@ export const createJob = async (req, res) => {
 
     // Populate creator details
     await job.populate("createdBy", "fullName email mobile profilePhotoUrl userType companyName rating completedJobs location");
+
+    // Send targeted FCM notifications to matching users asynchronously
+    sendJobCreatedNotifications(job, user)
+      .then((result) => {
+        console.log(`📣 Job notification dispatch complete for job ${job._id}:`, result);
+      })
+      .catch((err) => {
+        console.error("Job notification dispatch failed:", err);
+      });
 
     const response = {
       success: true,

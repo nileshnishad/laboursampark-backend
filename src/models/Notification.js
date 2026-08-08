@@ -19,6 +19,7 @@ const notificationSchema = new mongoose.Schema(
         "review_received",
         "message",
         "general",
+        "job_created",
       ],
       required: true,
     },

@@ -24,6 +24,7 @@ import publicRoutes from "./routes/publicRoutes.js";
 import smsRoutes from "./routes/smsRoutes.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js";
+import fcmRoutes from "./routes/fcmRoutes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -175,6 +176,9 @@ app.use("/api/twilio", twilioRoutes);
 
 // Subscription Routes
 app.use("/api/subscription", subscriptionRoutes);
+
+// FCM / Firebase Admin Routes
+app.use("/api/admin/fcm", fcmRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
