@@ -28,6 +28,23 @@ const normalizeAttachments = (attachments = []) => {
   });
 };
 
+const normalizeTicketStatus = (statusValue) => {
+  if (!statusValue) return null;
+
+  const normalized = String(statusValue).trim().toLowerCase().replace(/\s+/g, "_");
+  if (normalized === "inprogress") return "in_progress";
+  if (["open", "in_progress", "closed"].includes(normalized)) return normalized;
+  return null;
+};
+
+const getAdminNoteValue = (body) => {
+  if (body.adminNote !== undefined) return body.adminNote;
+  if (body.comment !== undefined) return body.comment;
+  if (body.note !== undefined) return body.note;
+  if (body.admin_comment !== undefined) return body.admin_comment;
+  return undefined;
+};
+
 const buildTicketPayload = (ticket) => ({
   _id: ticket._id,
   userId: ticket.userId,
@@ -39,7 +56,9 @@ const buildTicketPayload = (ticket) => ({
   message: ticket.message,
   attachments: ticket.attachments || [],
   status: ticket.status,
+  currentStatus: ticket.status,
   adminNote: ticket.adminNote || "",
+  latestAdminNote: ticket.adminNote || "",
   createdAt: ticket.createdAt,
   updatedAt: ticket.updatedAt,
   resolvedAt: ticket.resolvedAt,
@@ -110,7 +129,12 @@ export const getAllTicketsAdmin = async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status) {
+      const normalizedStatus = String(status).toLowerCase();
+      if (['open', 'in_progress', 'closed'].includes(normalizedStatus)) {
+        filter.status = normalizedStatus;
+      }
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [tickets, total] = await Promise.all([
@@ -136,14 +160,16 @@ export const getAllTicketsAdmin = async (req, res) => {
 export const updateTicketStatus = async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const { status, adminNote } = req.body;
+    const { status } = req.body;
+    const adminNote = getAdminNoteValue(req.body);
+    const normalizedStatus = normalizeTicketStatus(status);
 
     const ticket = await Ticket.findById(ticketId);
     if (!ticket) {
       return res.status(404).json({ success: false, message: "Ticket not found" });
     }
 
-    if (status) ticket.status = status;
+    if (normalizedStatus) ticket.status = normalizedStatus;
     if (adminNote !== undefined) ticket.adminNote = adminNote;
     if (ticket.status === "closed") ticket.resolvedAt = ticket.resolvedAt || new Date();
     if (ticket.status === "open") ticket.resolvedAt = null;
