@@ -2,6 +2,32 @@ import Ticket from "../models/Ticket.js";
 import User from "../models/User.js";
 import { logActivity } from "../utils/activityLogger.js";
 
+const normalizeAttachments = (attachments = []) => {
+  if (!Array.isArray(attachments)) {
+    return [];
+  }
+
+  return attachments.map((item) => {
+    if (typeof item === "string") {
+      const fileName = item.split("/").pop() || "attachment";
+      return {
+        filename: fileName,
+        originalName: fileName,
+        mimeType: "",
+        size: 0,
+        data: item,
+        storageType: "s3",
+      };
+    }
+
+    if (item && typeof item === "object") {
+      return item;
+    }
+
+    return item;
+  });
+};
+
 const buildTicketPayload = (ticket) => ({
   _id: ticket._id,
   userId: ticket.userId,
@@ -42,7 +68,7 @@ export const createTicket = async (req, res) => {
       category,
       subject,
       message,
-      attachments,
+      attachments: normalizeAttachments(attachments),
       adminNote,
     });
 

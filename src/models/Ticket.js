@@ -1,17 +1,5 @@
 import mongoose from "mongoose";
 
-const ticketAttachmentSchema = new mongoose.Schema(
-  {
-    filename: { type: String, required: true, trim: true },
-    originalName: { type: String, required: true, trim: true },
-    mimeType: { type: String, trim: true },
-    size: { type: Number, default: 0 },
-    data: { type: String, default: "" },
-    storageType: { type: String, default: "base64" },
-  },
-  { _id: false }
-);
-
 const ticketSchema = new mongoose.Schema(
   {
     userId: {
@@ -25,7 +13,10 @@ const ticketSchema = new mongoose.Schema(
     category: { type: String, trim: true, default: "general" },
     subject: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
-    attachments: [ticketAttachmentSchema],
+    attachments: {
+      type: [{ type: mongoose.Schema.Types.Mixed }],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["open", "closed"],
