@@ -149,6 +149,12 @@ export const sendFCMNotification = async (req, res) => {
       result = { successCount: 0, failureCount: tokens.length, responses: tokens.map(() => ({ error: 'Firebase not configured' })) };
     }
 
+    const failedResponses = (result?.responses || []).filter((response) => !response?.success).map((response, index) => ({
+      index,
+      error: response?.error?.message || response?.error || 'Unknown FCM error',
+      success: response?.success || false,
+    }));
+
     await createNotifications({
       title,
       message,
@@ -167,6 +173,7 @@ export const sendFCMNotification = async (req, res) => {
         successCount: result?.successCount || 0,
         failureCount: result?.failureCount || 0,
         responses: result?.responses || [],
+        failedResponses,
       },
     });
   } catch (error) {
@@ -212,6 +219,12 @@ export const sendFCMToUser = async (req, res) => {
       result = { successCount: 0, failureCount: user.deviceTokens.length, responses: user.deviceTokens.map(() => ({ error: 'Firebase not configured' })) };
     }
 
+    const failedResponses = (result?.responses || []).filter((response) => !response?.success).map((response, index) => ({
+      index,
+      error: response?.error?.message || response?.error || 'Unknown FCM error',
+      success: response?.success || false,
+    }));
+
     await Notification.create({
       userId: user._id,
       notificationType,
@@ -229,11 +242,31 @@ export const sendFCMToUser = async (req, res) => {
         userId,
         successCount: result?.successCount || 0,
         failureCount: result?.failureCount || 0,
+        failedResponses,
       },
     });
   } catch (error) {
     console.error('Send FCM to user error:', error);
     return res.status(500).json({ success: false, message: 'Failed to send FCM notification to user', error: error.message });
+  }
+};
+
+export const getTokenUsers = async (req, res) => {
+  try {
+    const users = await User.find({ deviceTokens: { $exists: true, $not: { $size: 0 } } })
+      .select('_id fullName email mobile deviceTokens userType')
+      .lean();
+
+    return res.json({
+      success: true,
+      data: {
+        totalUsersWithTokens: users.length,
+        users,
+      },
+    });
+  } catch (error) {
+    console.error('Get token users error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch token users', error: error.message });
   }
 };
 

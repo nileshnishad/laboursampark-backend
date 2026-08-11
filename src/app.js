@@ -180,6 +180,7 @@ app.use("/api/subscription", subscriptionRoutes);
 
 // FCM / Firebase Admin Routes
 app.use("/api/admin/fcm", fcmRoutes);
+app.use("/api/firebase", fcmRoutes);
 
 // Support Tickets Routes
 app.use("/api/tickets", ticketRoutes);
