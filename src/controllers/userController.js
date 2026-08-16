@@ -21,19 +21,17 @@ export const register = async (req, res) => {
 
 
     const { fullName, email, password, mobile, userType, dob } = req.body;
-
-
     // Validation
-    if (!fullName || !email || !password || !mobile || !userType) {
+    if (!fullName || !password || !mobile || !userType) {
       return res.status(400).json({
         success: false,
-        message: "Please provide all required fields: fullName, email, password, mobile, userType",
+        message: "Please provide all required fields: fullName, password, mobile, userType",
       });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (email && !emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
         message: "Please provide a valid email address",
@@ -49,9 +47,9 @@ export const register = async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { mobile }],
-    });
+    const duplicateConditions = [{ mobile }];
+    if (email) duplicateConditions.push({ email });
+    const existingUser = await User.findOne({ $or: duplicateConditions });
 
     if (existingUser) {
       return res.status(409).json({
