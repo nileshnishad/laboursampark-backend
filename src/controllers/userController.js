@@ -2,7 +2,6 @@ import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
-import { forgotPasswordTemplate } from "../utils/templates/forgotPasswordTemplate.js";
 import { sendTwilioSms } from "../utils/twilio/verifyService.js";
 import {
   labourWelcomeSms,
@@ -663,23 +662,19 @@ export const configCheck = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
   try {
-    const { email, mobile } = req.body;
+    const { mobile } = req.body;
 
     // Validation
-    if (!email && !mobile) {
+    if (!mobile) {
       return res.status(400).json({
         success: false,
-        message: "Please provide either email or mobile number",
+        message: "Please provide mobile number",
       });
     }
 
-    // Find user by email or mobile
-    const user = await User.findOne({
-      $or: [
-        email && { email },
-        mobile && { mobile },
-      ].filter(Boolean),
-    });
+    // Match the same +91 format used during registration.
+    const formattedMobile = /^\d{10}$/.test(mobile) ? `+91${mobile}` : mobile;
+    const user = await User.findOne({ mobile: formattedMobile });
 
     if (!user) {
       return res.status(404).json({
@@ -701,34 +696,33 @@ export const forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // Generate reset URL
+    // Generate reset URL for the web reset-password page.
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    // Prepare email content
-    const emailHtml = forgotPasswordTemplate(user.fullName || "User", resetUrl);
-
-    // Send password reset email
-    const emailResult = await sendEmail({
-      to: user.email,
-      subject: "Password Reset Request - Labour Sampark",
-      html: emailHtml,
-      text: `Click here to reset your password: ${resetUrl}`,
-    });
-
-    if (!emailResult.success) {
-      console.error("Failed to send password reset email:", emailResult.error);
+    // Send password reset link by SMS. The token remains valid for one hour.
+    try {
+      await sendTwilioSms({
+        to: formattedMobile,
+        body: `Labour Sampark password reset link: ${resetUrl}\nThis link will expire in 1 hour. - Labour Sampark`,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      });
+    } catch (smsError) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      console.error("Failed to send password reset SMS:", smsError);
       return res.status(500).json({
         success: false,
-        message: "Failed to send password reset email. Please try again later.",
-        error: emailResult.error,
+        message: "Failed to send password reset SMS. Please try again later.",
+        error: smsError.message || smsError,
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Password reset link has been sent to your email",
+      message: "Password reset link has been sent to your mobile number",
       data: {
-        message: "Please check your email for the password reset link",
+        message: "Please check your SMS for the password reset link. The link will expire in 1 hour.",
       },
     });
   } catch (error) {
