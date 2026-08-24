@@ -17,8 +17,10 @@ export const getReferralExpiryTime = (registrationTime) =>
 export const syncReferralWindowState = async (user) => {
   if (!user) return user;
 
+  // Always derive from createdAt — the stored referralExpiryTime is only a
+  // display mirror and must never be the source of truth for this check.
   const now = new Date();
-  const expiry = user.referralExpiryTime || getReferralExpiryTime(user.createdAt);
+  const expiry = getReferralExpiryTime(user.createdAt);
 
   if (user.referralStatus === "PENDING" && !user.referralCodeLocked && now > expiry) {
     user.referralStatus = "EXPIRED";
@@ -53,7 +55,7 @@ export const evaluateReferralCode = async (currentUser, rawCode) => {
   }
 
   const now = new Date();
-  const expiry = currentUser.referralExpiryTime || getReferralExpiryTime(currentUser.createdAt);
+  const expiry = getReferralExpiryTime(currentUser.createdAt);
   if (now > expiry) {
     return { eligible: false, reason: "72 hour referral window has expired" };
   }
@@ -111,7 +113,7 @@ export const getReferralStatusView = async (user) => {
     referralStatus: user.referralStatus,
     referralCodeLocked: user.referralCodeLocked,
     referralCodeEnteredAt: user.referralCodeEnteredAt || null,
-    referralExpiryTime: user.referralExpiryTime || getReferralExpiryTime(user.createdAt),
+    referralExpiryTime: getReferralExpiryTime(user.createdAt),
     referredBy: populated
       ? {
           userId: populated._id,
