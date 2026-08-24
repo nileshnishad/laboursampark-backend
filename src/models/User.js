@@ -291,6 +291,30 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Referral attribution (userCode is used as the shareable referral code)
+    referralStatus: {
+      type: String,
+      enum: ["PENDING", "REFERRED", "EXPIRED"],
+      default: "PENDING",
+    },
+    referredByUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    referralCodeLocked: {
+      type: Boolean,
+      default: false,
+    },
+    referralCodeEnteredAt: Date,
+    referralExpiryTime: Date,
+
+    // Wallet balance credited from referral rewards
+    walletBalance: {
+      type: Number,
+      default: 0,
+    },
+
     // Emergency Contact
     emergencyContact: {
       name: String,

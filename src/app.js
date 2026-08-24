@@ -26,6 +26,7 @@ import twilioRoutes from "./routes/twilioRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import fcmRoutes from "./routes/fcmRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
+import referralRoutes from "./referral/referral.routes.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -171,6 +172,15 @@ app.use("/api/notifications", notificationRoutes);
 // GET /api/payments/:paymentId/status - Get payment status for logged-in user
 // GET /api/payments/history - Get user payment history
 app.use("/api/payments", paymentRoutes);
+
+// Referral Routes
+// GET  /api/referrals/my-code - Get own referral code & stats
+// POST /api/referrals/validate - Validate a referral code
+// POST /api/referrals/apply - Apply/lock a referral code
+// GET  /api/referrals/status - Own referral status
+// GET  /api/referrals/history - Referral history as referrer
+// GET  /api/referrals/wallet - Wallet balance & referral reward transactions
+app.use("/api/referrals", referralRoutes);
 
 // Twilio Routes
 app.use("/api/twilio", twilioRoutes);

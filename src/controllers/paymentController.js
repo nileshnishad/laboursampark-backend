@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Payment from "../models/Payment.js";
 import User from "../models/User.js";
+import { processReferralRewardForPayment } from "../referral/referral.service.js";
 
 const DEFAULT_CHECKOUT_TTL_MINUTES = 20;
 const DEFAULT_VISIBILITY_DAYS = Number(process.env.PAYMENT_VISIBILITY_DAYS || 90);
@@ -188,6 +189,19 @@ const applyPostPaymentBenefits = async (payment) => {
   await User.updateOne({ _id: payment.userId }, { $set: updates });
   return updates;
 };
+
+// Runs on every successful payment (idempotent — a referred user can only
+// ever produce one reward record). Failures here must not block the payment.
+const applyReferralRewardBenefit = async (payment) => {
+  try {
+    const reward = await processReferralRewardForPayment(payment);
+    return reward ? { referralReward: { status: reward.status, amount: reward.amount } } : null;
+  } catch (error) {
+    console.error("Referral reward processing error:", error);
+    return null;
+  }
+};
+
 
 const verifyWithPayU = async ({ key, salt, commandUrl, txnId }) => {
   const command = "verify_payment";
@@ -521,7 +535,11 @@ const handlePayUCallback = async ({ req, res, forcedStatus }) => {
       payment.status = "success";
       payment.paidAt = new Date();
       payment.errorDetails = undefined;
+      const referralBenefit = await applyReferralRewardBenefit(payment);
       appliedBenefits = await applyPostPaymentBenefits(payment);
+      if (referralBenefit) {
+        appliedBenefits = { ...(appliedBenefits || {}), ...referralBenefit };
+      }
       if (appliedBenefits) {
         payment.benefitAppliedAt = new Date();
         payment.benefitAppliedDetails = appliedBenefits;
@@ -618,7 +636,11 @@ export const getPaymentStatus = async (req, res) => {
 
     // Self-heal for old successful records where benefit was not applied.
     if (payment.status === "success" && !payment.benefitAppliedAt) {
-      const appliedBenefits = await applyPostPaymentBenefits(payment);
+      const referralBenefit = await applyReferralRewardBenefit(payment);
+      let appliedBenefits = await applyPostPaymentBenefits(payment);
+      if (referralBenefit) {
+        appliedBenefits = { ...(appliedBenefits || {}), ...referralBenefit };
+      }
       if (appliedBenefits) {
         payment.benefitAppliedAt = new Date();
         payment.benefitAppliedDetails = appliedBenefits;
