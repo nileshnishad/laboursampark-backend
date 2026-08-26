@@ -302,6 +302,7 @@ const userSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    referralUserCode: String,
     referralCodeLocked: {
       type: Boolean,
       default: false,
