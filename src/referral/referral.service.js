@@ -65,6 +65,7 @@ export const evaluateReferralCode = async (currentUser, rawCode) => {
       fullName: referrer.fullName,
       userCode: referrer.userCode,
       userType: referrer.userType,
+      mobile: referrer.mobile,
     },
   };
 };
