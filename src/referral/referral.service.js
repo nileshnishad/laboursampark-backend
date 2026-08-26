@@ -10,21 +10,13 @@ const HOUR_MS = 60 * 60 * 1000;
 export const getReferralExpiryTime = (registrationTime) =>
   new Date(new Date(registrationTime).getTime() + REFERRAL_WINDOW_HOURS * HOUR_MS);
 
-/**
- * Lazily flips PENDING -> EXPIRED once the 72 hour window has passed and no
- * code was entered. Persists the transition so it only needs to run once.
- */
 export const syncReferralWindowState = async (user) => {
   if (!user) return user;
 
-  // Always derive from createdAt — the stored referralExpiryTime is only a
-  // display mirror and must never be the source of truth for this check.
-  const now = new Date();
-  const expiry = getReferralExpiryTime(user.createdAt);
-
-  if (user.referralStatus === "PENDING" && !user.referralCodeLocked && now > expiry) {
-    user.referralStatus = "EXPIRED";
-    user.referralCodeLocked = true;
+  // Restore users expired by the previous 72-hour policy.
+  if (user.referralStatus === "EXPIRED" && !user.referredByUserId) {
+    user.referralStatus = "PENDING";
+    user.referralCodeLocked = false;
     await user.save();
   }
 
@@ -52,12 +44,6 @@ export const evaluateReferralCode = async (currentUser, rawCode) => {
           ? "A referral code has already been applied to this account"
           : "Referral window has expired for this account",
     };
-  }
-
-  const now = new Date();
-  const expiry = getReferralExpiryTime(currentUser.createdAt);
-  if (now > expiry) {
-    return { eligible: false, reason: "72 hour referral window has expired" };
   }
 
   const referrer = await User.findOne({ userCode: code }).select(
@@ -113,7 +99,7 @@ export const getReferralStatusView = async (user) => {
     referralStatus: user.referralStatus,
     referralCodeLocked: user.referralCodeLocked,
     referralCodeEnteredAt: user.referralCodeEnteredAt || null,
-    referralExpiryTime: getReferralExpiryTime(user.createdAt),
+    referralExpiryTime: null,
     referredBy: populated
       ? {
           userId: populated._id,

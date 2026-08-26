@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import { sendTwilioSms } from "../utils/twilio/verifyService.js";
-import { getReferralExpiryTime } from "../referral/referral.service.js";
 import {
   labourWelcomeSms,
   contractorWelcomeSms,
@@ -109,9 +108,6 @@ export const register = async (req, res) => {
       if (!isNaN(lastSerial)) serial = lastSerial + 1;
     }
     user.userCode = `${prefix}${String(serial).padStart(6, "0")}`;
-
-    // Referral window: user has 72 hours from registration to enter a referral code.
-    user.referralExpiryTime = getReferralExpiryTime(new Date());
 
     // Save user (password will be hashed by pre-save hook)
     await user.save();

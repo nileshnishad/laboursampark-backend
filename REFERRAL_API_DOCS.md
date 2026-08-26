@@ -8,8 +8,8 @@ code is generated at registration.
 
 Core rules enforced by the backend:
 - A referral code can be entered only **once** per account.
-- A referral code can be entered only **within 72 hours** of registration.
-- After 72 hours with no code entered, the account is locked to `EXPIRED`.
+- A referral code can be entered at any time after registration.
+- A referral code can still be entered only once; after applying it, the account is locked.
 - Self-referral is not allowed.
 - ₹50 is credited to the referrer **only** when all of these are true:
   - Payment status = `success`
@@ -86,7 +86,7 @@ Response (not eligible):
   "message": "Referral code is not valid",
   "data": {
     "eligible": false,
-    "reason": "72 hour referral window has expired"
+    "reason": "A referral code has already been applied to this account"
   }
 }
 ```
@@ -125,7 +125,7 @@ Response (success):
 }
 ```
 
-Response (error, e.g. already applied / expired / invalid code / self referral):
+Response (error, e.g. already applied / invalid code / self referral):
 ```json
 {
   "success": false,
@@ -153,7 +153,7 @@ Response:
     "referralStatus": "REFERRED",
     "referralCodeLocked": true,
     "referralCodeEnteredAt": "2026-08-25T10:15:00.000Z",
-    "referralExpiryTime": "2026-08-28T09:00:00.000Z",
+    "referralExpiryTime": null,
     "referredBy": {
       "userId": "64f...",
       "fullName": "Ramesh Kumar",
@@ -316,5 +316,5 @@ Response:
 - `src/referral/referral.routes.js` — routes, mounted at `/api/referrals` in `src/app.js`
 - `src/models/User.js` — added `referralStatus`, `referredByUserId`, `referralCodeLocked`,
   `referralCodeEnteredAt`, `referralExpiryTime`, `walletBalance`
-- `src/controllers/userController.js` — sets `referralExpiryTime` at registration
+- `src/controllers/userController.js` — creates the user and userCode at registration
 - `src/controllers/paymentController.js` — calls `processReferralRewardForPayment()` on successful payments
