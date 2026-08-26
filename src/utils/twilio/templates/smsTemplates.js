@@ -21,6 +21,9 @@ export const subContractorJobCompletedSms = (name, jobId) =>
 export const subContractorRatingReceivedSms = (name, rating) =>
   `Namaste ${name}, aapko ${rating} star ki nayi rating mili hai. Apni profile check karein: laboursampark.com - Labour Sampark`;
 
+export const referralCodeAppliedSms = (referrerName, referredUserName) =>
+  `Namaste ${referrerName}, ${referredUserName} ne aapka referral code apply kiya hai. Is user ki pehli successful subscription payment ke baad aapko referral benefit milega. - Labour Sampark`;
+
 
 // ================= LABOUR =================
 

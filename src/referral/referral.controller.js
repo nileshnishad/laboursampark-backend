@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import Payment from "../models/Payment.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
+import { referralCodeAppliedSms } from "../utils/twilio/templates/smsTemplates.js";
 import ReferralReward from "./referralReward.model.js";
 import {
   evaluateReferralCode,
@@ -107,6 +109,26 @@ export const applyReferral = async (req, res) => {
     }
 
     const referrer = await applyReferralCode(user, referralCode);
+
+    const referralApplied =
+      Boolean(user.referredByUserId) &&
+      String(user.referredByUserId) === String(referrer.userId);
+
+    if (referralApplied && referrer.mobile) {
+      const referrerMobile = /^\d{10}$/.test(referrer.mobile)
+        ? `+91${referrer.mobile}`
+        : referrer.mobile;
+
+      try {
+        await sendTwilioSms({
+          to: referrerMobile,
+          body: referralCodeAppliedSms(referrer.fullName || "User", user.fullName || "A user"),
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+        });
+      } catch (smsError) {
+        console.error("Failed to send referral applied SMS:", smsError);
+      }
+    }
 
     return res.status(200).json({
       success: true,
