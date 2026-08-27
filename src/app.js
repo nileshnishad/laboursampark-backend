@@ -27,6 +27,7 @@ import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import fcmRoutes from "./routes/fcmRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import referralRoutes from "./referral/referral.routes.js";
+import connectDB from "./config/db.js";
 
 // ==========================================
 // 🔐 ENVIRONMENT CONFIGURATION
@@ -52,6 +53,20 @@ app.use(cors({ origin: "*" }));
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+// ==========================================
+// 🗄️ DB CONNECTION MIDDLEWARE
+// Ensures every request reuses the single cached MongoDB connection instead
+// of opening a new one per serverless invocation.
+// ==========================================
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    res.status(503).json({ success: false, message: "Database connection failed" });
+  }
+});
 
 // ==========================================
 // SMS/OTP Routes (must be after app is initialized)
