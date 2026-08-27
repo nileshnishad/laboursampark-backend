@@ -24,6 +24,9 @@ export const subContractorRatingReceivedSms = (name, rating) =>
 export const referralCodeAppliedSms = (referrerName, referredUserName) =>
   `Namaste ${referrerName}, ${referredUserName} ne aapka referral code apply kiya hai. Is user ki pehli successful subscription payment ke baad aapko Rs 50 referral benefit milega. - Labour Sampark`;
 
+export const referralFirstPaymentDoneSms = (referrerName, referredUserName) =>
+  `Namaste ${referrerName}, aapke referral se jude ${referredUserName} ne apni pehli subscription payment successfully complete kar li hai. Aapko Rs 50 referral benefit 24 hours ke andar mil jayega. - Labour Sampark`;
+
 
 // ================= LABOUR =================
 

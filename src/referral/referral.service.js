@@ -1,6 +1,9 @@
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import ReferralReward from "./referralReward.model.js";
 import WalletTransaction from "./walletTransaction.model.js";
+import { sendTwilioSms } from "../utils/twilio/verifyService.js";
+import { referralFirstPaymentDoneSms } from "../utils/twilio/templates/smsTemplates.js";
 
 export const REFERRAL_WINDOW_HOURS = 72;
 export const REFERRAL_REWARD_AMOUNT = 50;
@@ -160,13 +163,31 @@ const debitWallet = async ({ userId, amount, referenceId, description }) => {
 export const processReferralRewardForPayment = async (payment) => {
   if (!payment?.userId) return null;
 
+  // Runs on every successful payment, for every user, regardless of referral
+  // status — this is the "how many times has this user subscribed" counter.
+  // `new: false` returns the document as it was BEFORE this increment, so we
+  // can tell whether this specific payment was the user's first ever.
+  const userBeforePayment = await User.findByIdAndUpdate(
+    payment.userId,
+    { $inc: { subscriptionByCount: 1 } },
+    { new: false },
+  ).select("fullName userCode referredByUserId referralStatus createdAt firstPaymentStatus subscriptionByCount");
+
+  if (!userBeforePayment) return null;
+
+  const wasFirstPaymentEver =
+    (userBeforePayment.subscriptionByCount || 0) === 0 && !userBeforePayment.firstPaymentStatus;
+
+  if (wasFirstPaymentEver) {
+    await User.updateOne({ _id: payment.userId }, { $set: { firstPaymentStatus: true } });
+  }
+
   const existingReward = await ReferralReward.findOne({ referredUserId: payment.userId });
   if (existingReward) {
     return existingReward;
   }
 
-  const referredUser = await User.findById(payment.userId);
-  if (!referredUser) return null;
+  const referredUser = userBeforePayment;
 
   const gate = {
     paymentSuccess: payment.status === "success",
@@ -175,6 +196,9 @@ export const processReferralRewardForPayment = async (payment) => {
     notSelfReferral:
       !referredUser.referredByUserId ||
       String(referredUser.referredByUserId) !== String(referredUser._id),
+    // Double verification: the referral bonus is only for the referred
+    // user's genuine first payment, checked via both the flag and the count.
+    isFirstPayment: wasFirstPaymentEver,
   };
 
   const paidAt = payment.paidAt || new Date();
@@ -196,7 +220,7 @@ export const processReferralRewardForPayment = async (payment) => {
     });
   }
 
-  const referrer = await User.findById(referredUser.referredByUserId).select("userCode");
+  const referrer = await User.findById(referredUser.referredByUserId).select("userCode fullName mobile");
 
   const reward = await ReferralReward.create({
     referrerUserId: referredUser.referredByUserId,
@@ -206,6 +230,10 @@ export const processReferralRewardForPayment = async (payment) => {
     amount: REFERRAL_REWARD_AMOUNT,
     status: "CREDITED",
     creditedAt: new Date(),
+    // No PayU Payout integration yet — every credited reward waits for a
+    // manual bank/UPI transfer until that service is wired in.
+    payoutStatus: "PENDING",
+    payoutMethod: "manual",
   });
 
   await creditWallet({
@@ -214,6 +242,19 @@ export const processReferralRewardForPayment = async (payment) => {
     referenceId: reward._id,
     description: `Referral reward for referring ${referredUser.fullName || referredUser.userCode}`,
   });
+
+  if (referrer?.mobile) {
+    const referrerMobile = /^\d{10}$/.test(referrer.mobile) ? `+91${referrer.mobile}` : referrer.mobile;
+    try {
+      await sendTwilioSms({
+        to: referrerMobile,
+        body: referralFirstPaymentDoneSms(referrer.fullName || "User", referredUser.fullName || "A user"),
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      });
+    } catch (smsError) {
+      console.error("Failed to send referral first-payment SMS:", smsError);
+    }
+  }
 
   return reward;
 };
@@ -231,6 +272,18 @@ export const reverseReferralRewardForPayment = async (paymentId) => {
 
   reward.status = "REVERSED";
   reward.reversedAt = new Date();
+
+  // If the payout was already sent manually, flag it for offline recovery
+  // instead of silently marking it settled.
+  if (reward.payoutStatus === "PAID") {
+    reward.recoveryRequired = true;
+    reward.payoutNotes = [reward.payoutNotes, "Payout already paid before this reversal — recover manually."]
+      .filter(Boolean)
+      .join(" | ");
+  } else {
+    reward.payoutStatus = "NOT_APPLICABLE";
+  }
+
   await reward.save();
 
   await debitWallet({
@@ -239,6 +292,109 @@ export const reverseReferralRewardForPayment = async (paymentId) => {
     referenceId: reward._id,
     description: "Referral reward reversed due to payment refund",
   });
+
+  return reward;
+};
+
+/**
+ * Admin view: everything needed to manually verify and pay a referral
+ * reward out (userCode, referral code, referrer's total referral count,
+ * status) while PayU Payout isn't wired in yet.
+ */
+export const getPendingManualPayouts = async ({ page = 1, limit = 20 } = {}) => {
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const filter = { status: "CREDITED", payoutStatus: "PENDING" };
+
+  const [rewards, total] = await Promise.all([
+    ReferralReward.find(filter).sort({ createdAt: 1 }).skip(skip).limit(Number(limit)).lean(),
+    ReferralReward.countDocuments(filter),
+  ]);
+
+  const referrerIds = [...new Set(rewards.map((r) => String(r.referrerUserId)))];
+  const referredIds = [...new Set(rewards.map((r) => String(r.referredUserId)))];
+
+  const [referrers, referredUsers, referralCounts] = await Promise.all([
+    User.find({ _id: { $in: referrerIds } }).select("fullName userCode mobile walletBalance").lean(),
+    User.find({ _id: { $in: referredIds } }).select("fullName userCode").lean(),
+    User.aggregate([
+      { $match: { referredByUserId: { $in: referrerIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+      { $group: { _id: "$referredByUserId", count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const referrerMap = new Map(referrers.map((u) => [String(u._id), u]));
+  const referredMap = new Map(referredUsers.map((u) => [String(u._id), u]));
+  const countMap = new Map(referralCounts.map((c) => [String(c._id), c.count]));
+
+  const data = rewards.map((r) => {
+    const referrer = referrerMap.get(String(r.referrerUserId));
+    const referred = referredMap.get(String(r.referredUserId));
+    return {
+      rewardId: r._id,
+      amount: r.amount,
+      status: r.status,
+      payoutStatus: r.payoutStatus,
+      paymentId: r.paymentId,
+      createdAt: r.createdAt,
+      referrer: referrer
+        ? {
+            userId: referrer._id,
+            fullName: referrer.fullName,
+            userCode: referrer.userCode,
+            mobile: referrer.mobile,
+            walletBalance: referrer.walletBalance,
+            totalReferralCount: countMap.get(String(referrer._id)) || 0,
+          }
+        : null,
+      referredUser: referred
+        ? { userId: referred._id, fullName: referred.fullName, userCode: referred.userCode }
+        : null,
+    };
+  });
+
+  return {
+    data,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit)) || 1,
+    },
+  };
+};
+
+/**
+ * Records that a referral reward was paid out manually (bank/UPI etc.)
+ * while PayU Payout isn't available. Does not move any money itself — the
+ * transfer happens outside the app; this just closes out the ledger entry.
+ */
+export const markReferralPayoutPaid = async (rewardId, { payoutReference, notes } = {}) => {
+  const reward = await ReferralReward.findById(rewardId);
+  if (!reward) {
+    const error = new Error("Referral reward not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (reward.status !== "CREDITED") {
+    const error = new Error("Only CREDITED rewards can be marked as paid out");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (reward.payoutStatus === "PAID") {
+    const error = new Error("This reward's payout is already marked as paid");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  reward.payoutStatus = "PAID";
+  reward.payoutMethod = "manual";
+  reward.payoutReference = payoutReference || reward.payoutReference;
+  reward.payoutNotes = notes || reward.payoutNotes;
+  reward.payoutPaidAt = new Date();
+  await reward.save();
 
   return reward;
 };

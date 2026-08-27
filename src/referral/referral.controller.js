@@ -12,6 +12,8 @@ import {
   processReferralRewardForPayment,
   reverseReferralRewardForPayment,
   getReferralExpiryTime,
+  getPendingManualPayouts,
+  markReferralPayoutPaid,
   REFERRAL_REWARD_AMOUNT,
 } from "./referral.service.js";
 
@@ -199,6 +201,58 @@ export const getReferralHistory = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch referral history",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// MANUAL PAYOUTS (until PayU Payout service is available)
+// ==========================================
+// Reward crediting (in-app wallet ledger) already happens automatically.
+// Real-money payout to the referrer is manual for now; these endpoints let
+// admins verify userCode/referral code/count/status and settle it by hand.
+export const listPendingManualPayouts = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const result = await getPendingManualPayouts({ page, limit });
+
+    return res.status(200).json({
+      success: true,
+      message: "Pending manual payouts fetched successfully",
+      data: result.data,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    console.error("List pending manual payouts error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch pending manual payouts",
+      error: error.message,
+    });
+  }
+};
+
+export const markPayoutPaid = async (req, res) => {
+  try {
+    const { rewardId } = req.params;
+    const { payoutReference, notes } = req.body;
+
+    const reward = await markReferralPayoutPaid(rewardId, { payoutReference, notes });
+
+    return res.status(200).json({
+      success: true,
+      message: "Referral payout marked as paid",
+      data: reward,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    console.error("Mark payout paid error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to mark payout as paid",
       error: error.message,
     });
   }

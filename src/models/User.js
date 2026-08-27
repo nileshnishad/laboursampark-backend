@@ -310,6 +310,18 @@ const userSchema = new mongoose.Schema(
     referralCodeEnteredAt: Date,
     referralExpiryTime: Date,
 
+    // True once this user's first successful subscription payment is done.
+    // Used (together with subscriptionByCount) to gate one-time referral rewards.
+    firstPaymentStatus: {
+      type: Boolean,
+      default: false,
+    },
+    // Incremented on every successful subscription payment by this user.
+    subscriptionByCount: {
+      type: Number,
+      default: 0,
+    },
+
     // Wallet balance credited from referral rewards
     walletBalance: {
       type: Number,

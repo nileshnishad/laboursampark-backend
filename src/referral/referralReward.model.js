@@ -40,6 +40,31 @@ const referralRewardSchema = new mongoose.Schema(
     notEligibleReason: String,
     creditedAt: Date,
     reversedAt: Date,
+
+    // Real-money payout to the referrer. Separate from `status` (in-app
+    // wallet ledger) because PayU Payout isn't wired in yet — until then
+    // this stays "PENDING" for admins to settle manually, then switches to
+    // "PAID". `payoutMethod` flips to "payu_payout" once that service is live.
+    payoutStatus: {
+      type: String,
+      enum: ["NOT_APPLICABLE", "PENDING", "PAID"],
+      default: "NOT_APPLICABLE",
+      index: true,
+    },
+    payoutMethod: {
+      type: String,
+      enum: ["manual", "payu_payout"],
+      default: "manual",
+    },
+    payoutReference: String,
+    payoutNotes: String,
+    payoutPaidAt: Date,
+    // Set when a reward is reversed (refund) after its payout was already
+    // paid out manually — flags that the ₹50 needs to be recovered outside the app.
+    recoveryRequired: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

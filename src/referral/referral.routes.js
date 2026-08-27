@@ -9,6 +9,8 @@ import {
   getWalletTransactions,
   reprocessPaymentReward,
   reverseReward,
+  listPendingManualPayouts,
+  markPayoutPaid,
 } from "./referral.controller.js";
 
 const router = express.Router();
@@ -41,6 +43,12 @@ router.get("/wallet", authenticateToken, getWalletTransactions);
 
 // POST /api/referrals/admin/process/:paymentId - Manually (re)process reward for a payment
 router.post("/admin/process/:paymentId", authenticateToken, isAdmin, reprocessPaymentReward);
+
+// GET /api/referrals/admin/payouts/pending - List rewards awaiting manual payout
+router.get("/admin/payouts/pending", authenticateToken, isAdmin, listPendingManualPayouts);
+
+// POST /api/referrals/admin/payouts/:rewardId/mark-paid - Record a manual payout
+router.post("/admin/payouts/:rewardId/mark-paid", authenticateToken, isAdmin, markPayoutPaid);
 
 // POST /api/referrals/admin/reverse/:paymentId - Reverse a credited reward (refund case)
 router.post("/admin/reverse/:paymentId", authenticateToken, isAdmin, reverseReward);
