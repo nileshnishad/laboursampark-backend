@@ -69,7 +69,7 @@ router.get("/visible", authenticateToken, getVisibleUsers);
 // ==========================================
 
 // GET /api/users/admin/all - Get all users with optional filters & pagination (ADMIN)
-router.get("/admin/all", authenticateToken, isAdmin, getAllUsers);
+router.get("/admin/allUser", authenticateToken, isAdmin, getAllUsers);
 
 // POST /api/users/admin/update/:id - Update any user by ID (ADMIN)
 router.post("/admin/update/:id", authenticateToken, isAdmin, adminUpdateUser);

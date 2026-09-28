@@ -1225,19 +1225,19 @@ export const resetPasswordWithOTP = async (req, res) => {
 // 👮 ADMIN — GET ALL USERS
 // ==========================================
 
+
 export const getAllUsers = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      search,
-    } = req.query;
+    const { search } = req.query;
 
     const filter = {};
 
     // Search by name, email or mobile
     if (search && search.trim() !== "") {
-      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedSearch = search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
       filter.$or = [
         { fullName: { $regex: escapedSearch, $options: "i" } },
         { email: { $regex: escapedSearch, $options: "i" } },
@@ -1246,17 +1246,14 @@ export const getAllUsers = async (req, res) => {
       ];
     }
 
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-    const skip = (pageNum - 1) * limitNum;
-
     const [users, total] = await Promise.all([
       User.find(filter)
-        .select("-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken -emailVerificationExpire -verificationOTP -verificationOTPExpire -deviceTokens")
+        .select(
+          "-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken -emailVerificationExpire -verificationOTP -verificationOTPExpire -deviceTokens"
+        )
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum)
         .lean(),
+
       User.countDocuments(filter),
     ]);
 
@@ -1265,16 +1262,12 @@ export const getAllUsers = async (req, res) => {
       message: "Users fetched successfully",
       data: {
         users,
-        pagination: {
-          total,
-          page: pageNum,
-          limit: limitNum,
-          totalPages: Math.ceil(total / limitNum),
-        },
+        total,
       },
     });
   } catch (error) {
     console.error("getAllUsers error:", error);
+
     res.status(500).json({
       success: false,
       message: "An error occurred while fetching users",
@@ -1282,6 +1275,8 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+
+
 
 // ==========================================
 // 👮 ADMIN — UPDATE ANY USER BY ID
