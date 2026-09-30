@@ -941,7 +941,9 @@ curl -X GET "http://localhost:5000/api/job-history/contractor/applications?statu
 
 ---
 
-### 6.10 Payments (PayU)
+### 6.10 Payments (PayU and Cashfree)
+
+Cashfree Payment Gateway and Payouts V2 are available under `/api/cashfree`; see [CASHFREE_INTEGRATION.md](CASHFREE_INTEGRATION.md) for configuration, request bodies, webhook setup, and status mapping. Existing PayU endpoints remain supported during migration.
 
 #### Create PayU Checkout Link
 ```bash

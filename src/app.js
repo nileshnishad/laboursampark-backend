@@ -20,6 +20,7 @@ import userJobHistoryRoutes from "./routes/userJobHistoryRoutes.js";
 import userReviewRoutes from "./routes/userReviewRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import cashfreeRoutes from "./routes/cashfreeRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import smsRoutes from "./routes/smsRoutes.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
@@ -51,7 +52,12 @@ app.use(cors({ origin: "*" }));
 // 🛡️ SECURITY & PARSING MIDDLEWARE
 // ==========================================
 
-app.use(express.json({ limit: "20mb" }));
+app.use(express.json({
+  limit: "20mb",
+  verify: (req, res, buffer) => {
+    req.rawBody = buffer.toString("utf8");
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 // ==========================================
@@ -187,6 +193,7 @@ app.use("/api/notifications", notificationRoutes);
 // GET /api/payments/:paymentId/status - Get payment status for logged-in user
 // GET /api/payments/history - Get user payment history
 app.use("/api/payments", paymentRoutes);
+app.use("/api/cashfree", cashfreeRoutes);
 
 // Referral Routes
 // GET  /api/referrals/my-code - Get own referral code & stats

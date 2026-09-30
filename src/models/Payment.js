@@ -10,7 +10,7 @@ const paymentSchema = new mongoose.Schema(
     },
     gateway: {
       type: String,
-      enum: ["payu"],
+      enum: ["payu", "cashfree"],
       default: "payu",
       index: true,
     },
@@ -63,6 +63,18 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    cashfreeOrderId: { type: String, trim: true, index: true, sparse: true },
+    cashfreePaymentId: { type: String, trim: true, index: true, sparse: true },
+    cashfreeStatus: { type: String, trim: true },
+    idempotencyKey: { type: String, trim: true, index: true, sparse: true },
+    refund: {
+      refundId: { type: String, trim: true },
+      cashfreeRefundId: { type: String, trim: true },
+      amount: { type: Number, min: 0 },
+      status: { type: String, trim: true },
+      response: { type: mongoose.Schema.Types.Mixed, default: {} },
+      createdAt: Date,
+    },
     paymentUrlToken: {
       type: String,
       required: true,
@@ -109,6 +121,10 @@ const paymentSchema = new mongoose.Schema(
       default: {},
     },
     payuResponse: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    cashfreeResponse: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },

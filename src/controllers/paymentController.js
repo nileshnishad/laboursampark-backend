@@ -101,7 +101,7 @@ const buildResponseHash = ({ body, salt }) => {
   return sha512(pieces.join("|"));
 };
 
-const updatePaymentSummary = async ({ userId, oldStatus, newStatus, amount }) => {
+export const updatePaymentSummary = async ({ userId, oldStatus, newStatus, amount }) => {
   if (!userId) return;
 
   const oldSuccess = oldStatus === "success";
@@ -149,7 +149,7 @@ const updatePaymentSummary = async ({ userId, oldStatus, newStatus, amount }) =>
   await User.updateOne({ _id: userId }, update);
 };
 
-const applyPostPaymentBenefits = async (payment) => {
+export const applyPostPaymentBenefits = async (payment) => {
   if (!payment?.userId) return null;
   if (payment?.benefitAppliedAt) return payment.benefitAppliedDetails || {};
 
@@ -192,7 +192,7 @@ const applyPostPaymentBenefits = async (payment) => {
 
 // Runs on every successful payment (idempotent — a referred user can only
 // ever produce one reward record). Failures here must not block the payment.
-const applyReferralRewardBenefit = async (payment) => {
+export const applyReferralRewardBenefit = async (payment) => {
   try {
     const reward = await processReferralRewardForPayment(payment);
     return reward ? { referralReward: { status: reward.status, amount: reward.amount } } : null;
