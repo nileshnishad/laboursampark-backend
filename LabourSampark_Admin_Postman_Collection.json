@@ -1,0 +1,1107 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "LabourSampark Admin APIs",
+    "description": "Comprehensive, verified Postman collection for all LabourSampark Admin Panel and administrative APIs extracted directly from the Node.js / Express backend codebase.\n\n### Authentication\nMost endpoints require Bearer JWT Authentication generated from Admin Login (`POST /api/users/login`) with `userType: 'admin'` or `'super_admin'`. Collection-level Bearer authentication is preconfigured with `{{adminToken}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9000",
+      "type": "string",
+      "description": "Base URL of the LabourSampark backend API server"
+    },
+    {
+      "key": "adminToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "type": "string",
+      "description": "Admin session-bound JWT Bearer token"
+    },
+    {
+      "key": "userId",
+      "value": "65f000000000000000000001",
+      "type": "string",
+      "description": "Target User ObjectId (Labour, Contractor, Sub-contractor, Admin)"
+    },
+    {
+      "key": "jobId",
+      "value": "65f000000000000000000002",
+      "type": "string",
+      "description": "Target Job ObjectId"
+    },
+    {
+      "key": "documentId",
+      "value": "65f000000000000000000003",
+      "type": "string",
+      "description": "Target Document ObjectId for KYC verification"
+    },
+    {
+      "key": "paymentId",
+      "value": "65f000000000000000000004",
+      "type": "string",
+      "description": "Target Payment ObjectId (PayU / Cashfree)"
+    },
+    {
+      "key": "payoutId",
+      "value": "65f000000000000000000005",
+      "type": "string",
+      "description": "Cashfree Payout ObjectId"
+    },
+    {
+      "key": "beneficiaryId",
+      "value": "65f000000000000000000006",
+      "type": "string",
+      "description": "Cashfree Verified Beneficiary ObjectId"
+    },
+    {
+      "key": "rewardId",
+      "value": "65f000000000000000000007",
+      "type": "string",
+      "description": "ReferralReward ObjectId"
+    },
+    {
+      "key": "ticketId",
+      "value": "65f000000000000000000008",
+      "type": "string",
+      "description": "Support Ticket ObjectId"
+    },
+    {
+      "key": "inquiryId",
+      "value": "65f000000000000000000009",
+      "type": "string",
+      "description": "Inquiry ObjectId"
+    },
+    {
+      "key": "bannerId",
+      "value": "65f000000000000000000010",
+      "type": "string",
+      "description": "Mobile Banner ObjectId"
+    },
+    {
+      "key": "skillId",
+      "value": "65f000000000000000000011",
+      "type": "string",
+      "description": "Master Skill ObjectId"
+    },
+    {
+      "key": "businessId",
+      "value": "65f000000000000000000012",
+      "type": "string",
+      "description": "Master Business Name/Category ObjectId"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@laboursampark.com\",\n  \"password\": \"adminPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "login"]
+            },
+            "description": "Authenticates an administrator with email/mobile and password. Generates a session-bound JWT containing `userId`, `userType` (`admin` or `super_admin`), and a rotated `sessionId`. Also available via `/auth/login`.\n\n**Controller**: `login` in `src/controllers/userController.js`\n**Auth**: Public"
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "logout"]
+            },
+            "description": "Logs out the authenticated administrator, sets `isLoggedIn: false`, nullifies `activeSessionId`, and stamps `lastLogoutAt`. Also available via `/auth/logout`.\n\n**Controller**: `logout` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            },
+            "description": "Fetches current authenticated administrator's profile information.\n\n**Controller**: `getProfile` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Admin Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Senior System Administrator\",\n  \"bio\": \"Super Admin managing LabourSampark operations\",\n  \"preferredContactMethod\": \"call\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            },
+            "description": "Updates profile details for the logged-in administrator. Restricted fields (`_id`, `password`, `email`, `mobile`, `createdAt`) cannot be edited via this route.\n\n**Controller**: `updateProfile` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Change Admin Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"adminPassword123\",\n  \"newPassword\": \"newSecureAdminPass456\",\n  \"confirmPassword\": \"newSecureAdminPass456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "change-password"]
+            },
+            "description": "Allows an authenticated administrator to change their login password after validating the current password.\n\n**Controller**: `changePassword` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Platform Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/public/dashboard-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "dashboard-stats"]
+            },
+            "description": "Fetches aggregated platform metrics across users, jobs, reviews, skills, inquiries, documents, payments, notifications, and job enquiries.\n\n**Controller**: `getDashboardStats` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Job & Platform Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "jobs", "stats"]
+            },
+            "description": "When invoked by an administrator (`userType: 'admin'` or `'super_admin'`), returns platform-wide operational statistics: totalJobs, activeJobs, completedJobs, totalApplications, totalAccepted, totalRejected, and totalUsers.\n\n**Controller**: `getJobStats` in `src/controllers/jobStatsController.js`\n**Auth**: Bearer Token (`authenticateToken` with Admin role)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/admin/allUser?search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "admin", "allUser"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search term matching fullName, email, mobile, or userCode"
+                }
+              ]
+            },
+            "description": "Retrieves all users across the platform (labour, contractor, sub_contractor, admin, super_admin) with search filtering and sorting (`createdAt: -1`). Sensitive tokens and passwords are automatically excluded. Also available via `/auth/admin/allUser`.\n\n**Controller**: `getAllUsers` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Update User By ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\",\n  \"userType\": \"contractor\",\n  \"display\": true,\n  \"isVerified\": true,\n  \"aadharVerified\": true,\n  \"panVerified\": true,\n  \"licenseVerified\": true,\n  \"adminNotes\": \"Verified after physical KYC and GST check.\",\n  \"blockReason\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/admin/update/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "admin", "update", "{{userId}}"]
+            },
+            "description": "Allows an administrator to modify any user's profile, status (`active`, `inactive`, `blocked`, `suspended`), userType (`labour`, `contractor`, `sub_contractor`, `admin`, `super_admin`), profile visibility (`display`), verification badges, and administrative notes. Also available via `/auth/admin/update/:id`.\n\n**Controller**: `adminUpdateUser` in `src/controllers/userController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Get All Jobs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/admin/all?page=1&limit=20&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "jobs", "admin", "all"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (max: 100)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search keyword matching workTitle, description, city, or state"
+                }
+              ]
+            },
+            "description": "Retrieves all jobs created on the platform with populated creator details (`fullName email mobile userType userCode companyName`), pagination, and keyword search.\n\n**Controller**: `getAllJobsAdmin` in `src/controllers/jobController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)\n**Note**: In router definition, route is defined after wildcard `/:jobId`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Document & KYC Verification",
+      "item": [
+        {
+          "name": "Get Pending Documents for Verification",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/admin/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "admin", "pending"]
+            },
+            "description": "Retrieves all uploaded user documents pending verification (`status: 'pending'`), sorted chronologically and populated with user profile info (`fullName email mobile`).\n\n**Controller**: `getPendingDocuments` in `src/controllers/documentController.js`\n**Auth**: Admin operations endpoint"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Document Verification Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"verificationNotes\": \"Aadhar card validated against government portal\",\n  \"verifiedBy\": \"Admin Desk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/document/{{documentId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "document", "{{documentId}}", "status"]
+            },
+            "description": "Updates the verification status of a document. Allowed status values: `pending`, `approved`, `rejected`, `expired`. When approved, sets `verified: true` and records `verifiedAt`.\n\n**Controller**: `updateDocumentStatus` in `src/controllers/documentController.js`\n**Auth**: Admin/Verifier operations endpoint"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Get All Payments (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/admin/all?page=1&limit=20&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "admin", "all"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (max: 100)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by txnId, receipt, customer email, customer phone, or productInfo"
+                }
+              ]
+            },
+            "description": "Retrieves all payments across gateways (PayU, Cashfree) with pagination, populated user details, and status-level aggregation summaries (counts and totalAmount per status).\n\n**Controller**: `getAllPayments` in `src/controllers/paymentController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Cashfree Refund (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99.00,\n  \"note\": \"Customer requested cancellation within refund window\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payments/{{paymentId}}/refund",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payments", "{{paymentId}}", "refund"]
+            },
+            "description": "Initiates a refund via Cashfree Payment Gateway for an existing successful payment transaction.\n\n**Controller**: `createCashfreeRefund` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cashfree Refund Status (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payments/{{paymentId}}/refund",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payments", "{{paymentId}}", "refund"]
+            },
+            "description": "Checks and syncs the refund status for a payment directly from Cashfree Payment Gateway.\n\n**Controller**: `getCashfreeRefund` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Cashfree Payout (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": \"{{beneficiaryId}}\",\n  \"amount\": 500.00,\n  \"transferMode\": \"banktransfer\",\n  \"remarks\": \"LabourSampark payout\",\n  \"idempotencyKey\": \"payout_idem_001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payouts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payouts"]
+            },
+            "description": "Initiates a direct money payout/transfer to a verified beneficiary via Cashfree Payouts API.\n\n**Controller**: `createCashfreePayout` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "List Cashfree Payouts (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payouts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payouts"]
+            },
+            "description": "Retrieves recent Cashfree payouts created by administrators (sorted newest first, up to 100 records).\n\n**Controller**: `listCashfreePayouts` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cashfree Payout Status (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payouts/{{payoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payouts", "{{payoutId}}"]
+            },
+            "description": "Fetches current status of a specific transfer from Cashfree Payouts API and updates internal DB records.\n\n**Controller**: `getCashfreePayout` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Retry Failed Cashfree Payout (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cashfree/payouts/{{payoutId}}/retry",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cashfree", "payouts", "{{payoutId}}", "retry"]
+            },
+            "description": "Retries a previously failed, rejected, or reversed payout using the original transfer details.\n\n**Controller**: `retryCashfreePayout` in `src/controllers/cashfreeController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Referrals",
+      "item": [
+        {
+          "name": "List Pending Manual Referral Payouts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/referrals/admin/payouts/pending?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "referrals", "admin", "payouts", "pending"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page"
+                }
+              ]
+            },
+            "description": "Lists all referral reward ledger records (`status: 'CREDITED'`, `payoutStatus: 'PENDING'`) awaiting manual offline bank/UPI payout. Enriches records with referrer's userCode, mobile, wallet balance, and verified referral count.\n\n**Controller**: `listPendingManualPayouts` in `src/referral/referral.controller.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Referral Payout as Paid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payoutReference\": \"UPI-REF-20261001-9988\",\n  \"notes\": \"Transferred ₹50 via Google Pay / UPI\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/referrals/admin/payouts/{{rewardId}}/mark-paid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "referrals", "admin", "payouts", "{{rewardId}}", "mark-paid"]
+            },
+            "description": "Marks a referral reward payout as settled (`payoutStatus: 'PAID'`) after the administrator manually completes bank/UPI payment.\n\n**Controller**: `markPayoutPaid` in `src/referral/referral.controller.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Reprocess Referral Reward for Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/referrals/admin/process/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "referrals", "admin", "process", "{{paymentId}}"]
+            },
+            "description": "Admin recovery endpoint to manually evaluate, gate, and credit referral rewards for a successful subscription payment.\n\n**Controller**: `reprocessPaymentReward` in `src/referral/referral.controller.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Reverse Referral Reward on Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/referrals/admin/reverse/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "referrals", "admin", "reverse", "{{paymentId}}"]
+            },
+            "description": "Admin endpoint to reverse an earlier credited referral reward (and debit the referrer's wallet) when the underlying subscription payment is refunded.\n\n**Controller**: `reverseReward` in `src/referral/referral.controller.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Multicast Targeted Notification (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Platform Maintenance Notice\",\n  \"message\": \"LabourSampark will undergo scheduled maintenance tonight at 11 PM.\",\n  \"userType\": \"labour\",\n  \"notificationType\": \"general\",\n  \"priority\": \"high\",\n  \"data\": {\n    \"actionUrl\": \"/announcements\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/fcm/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "fcm", "send"]
+            },
+            "description": "Sends targeted push notifications via Firebase Cloud Messaging (FCM) based on criteria (`userType`, `skills`, `businessTypes`, `userIds`, `excludeUserIds`) and creates database notification records. Also available at `/api/firebase/send`.\n\n**Controller**: `sendFCMNotification` in `src/controllers/fcmController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Send Notification to Single User (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Document Approved\",\n  \"message\": \"Your contractor business license has been approved by admin.\",\n  \"notificationType\": \"verification\",\n  \"priority\": \"high\",\n  \"data\": {\n    \"status\": \"approved\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/fcm/send-to-user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "fcm", "send-to-user"]
+            },
+            "description": "Sends a direct push notification to all active devices of a single specified user and records an in-app Notification. Also available at `/api/firebase/send-to-user`.\n\n**Controller**: `sendFCMToUser` in `src/controllers/fcmController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get FCM Notification Statistics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/fcm/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "fcm", "stats"]
+            },
+            "description": "Returns stats on total users with registered device tokens and the 10 most recent general notifications. Also available at `/api/firebase/stats`.\n\n**Controller**: `getFCMStats` in `src/controllers/fcmController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Users with FCM Device Tokens (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/fcm/token-users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "fcm", "token-users"]
+            },
+            "description": "Returns list of all users who have active FCM device tokens registered on the platform. Also available at `/api/firebase/token-users`.\n\n**Controller**: `getTokenUsers` in `src/controllers/fcmController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complaints & Support Tickets",
+      "item": [
+        {
+          "name": "Get All Support Tickets (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/admin/all?status=open&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "admin", "all"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "open",
+                  "description": "Filter by status: open | in_progress | closed"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page"
+                }
+              ]
+            },
+            "description": "Fetches all support tickets with status filtering and pagination.\n\n**Controller**: `getAllTicketsAdmin` in `src/controllers/ticketController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Support Ticket By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/admin/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "admin", "{{ticketId}}"]
+            },
+            "description": "Retrieves comprehensive support ticket details including user contact info, messages, attachments, status, and latest admin note.\n\n**Controller**: `getTicketById` in `src/controllers/ticketController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Support Ticket Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"closed\",\n  \"adminNote\": \"Payment grievance verified and wallet balance adjusted accordingly.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/admin/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "admin", "{{ticketId}}"]
+            },
+            "description": "Updates ticket status (`open`, `in_progress`, `closed`) and appends an administrative resolution note. Setting status to `closed` automatically sets `resolvedAt`.\n\n**Controller**: `updateTicketStatus` in `src/controllers/ticketController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All General Inquiries (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries?status=&priority=&inquiryType=&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by status: new | in_progress | resolved | closed"
+                },
+                {
+                  "key": "priority",
+                  "value": "",
+                  "description": "Filter by priority: low | medium | high | urgent"
+                },
+                {
+                  "key": "inquiryType",
+                  "value": "",
+                  "description": "Filter by type: general | support | feedback | complaint | partnership | business"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page"
+                }
+              ]
+            },
+            "description": "Lists all user inquiries submitted via web/app with filtering by status, priority, and inquiry type.\n\n**Controller**: `getAllInquiries` in `src/controllers/inquiryController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Inquiry Statistics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "stats"]
+            },
+            "description": "Aggregates total inquiry counts grouped by status and by inquiry type.\n\n**Controller**: `getInquiryStats` in `src/controllers/inquiryController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Inquiry Details By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}"]
+            },
+            "description": "Retrieves single inquiry details by ID with populated user, assigned admin, and responder information.\n\n**Controller**: `getInquiryById` in `src/controllers/inquiryController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Inquiry Status & Response",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\",\n  \"priority\": \"medium\",\n  \"response\": \"Thank you for reaching out. We have resolved your issue.\",\n  \"adminNotes\": \"Contacted user via phone call.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}"]
+            },
+            "description": "Updates inquiry status (`new`, `in_progress`, `resolved`, `closed`), priority, administrative notes, or records an official resolution response message.\n\n**Controller**: `updateInquiry` in `src/controllers/inquiryController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Inquiry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}"]
+            },
+            "description": "Permanently deletes an inquiry record from the database.\n\n**Controller**: `deleteInquiry` in `src/controllers/inquiryController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Content Management",
+      "item": [
+        {
+          "name": "Get All Mobile Banners (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/public/mobile-banner/admin/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "mobile-banner", "admin", "all"]
+            },
+            "description": "Retrieves all mobile banners (visible and hidden) with creator and updater admin details.\n\n**Controller**: `getAllMobileBanners` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Mobile Banner (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Diwali Special Contractor Plan\",\n  \"bannerImageUrl\": \"https://storage.googleapis.com/laboursampark/banners/diwali2026.png\",\n  \"link\": \"/subscription/plans\",\n  \"context\": \"festive_offer\",\n  \"visible\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/mobile-banner",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "mobile-banner"]
+            },
+            "description": "Creates a new promotional banner for the mobile app home screen. If `visible` is set to `true`, all other banners are automatically deactivated.\n\n**Controller**: `createMobileBanner` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Mobile Banner (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Diwali Offer\",\n  \"bannerImageUrl\": \"https://storage.googleapis.com/laboursampark/banners/diwali2026_v2.png\",\n  \"link\": \"/subscription/plans\",\n  \"context\": \"festive_offer\",\n  \"visible\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/mobile-banner/{{bannerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "mobile-banner", "{{bannerId}}"]
+            },
+            "description": "Updates an existing mobile banner's title, image, deep link, context, or visibility status.\n\n**Controller**: `updateMobileBanner` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Mobile Banner (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/public/mobile-banner/{{bannerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "mobile-banner", "{{bannerId}}"]
+            },
+            "description": "Deletes a mobile banner record by ID.\n\n**Controller**: `deleteMobileBanner` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Settings & App Configuration",
+      "item": [
+        {
+          "name": "Configure App Version & Force Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"android\",\n  \"latestVersion\": \"1.0.18\",\n  \"minimumVersion\": \"1.0.16\",\n  \"forceUpdate\": true,\n  \"message\": \"Critical security and payment updates are included. Please update to continue.\",\n  \"storeUrl\": \"https://play.google.com/store/apps/details?id=com.laboursampark.app\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/app/version-config",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "app", "version-config"]
+            },
+            "description": "Configures latest version, minimum required version, store download link, and force update rules for Android or iOS platforms.\n\n**Controller**: `createOrUpdateAppVersion` in `src/controllers/appVersionController.js`\n**Auth**: Bearer Token (`authenticateToken`, `isAdmin`)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Master Data",
+      "item": [
+        {
+          "name": "Get All Skills (Master Data)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/public/getskills?page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "getskills"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1, 20 items per page)"
+                }
+              ]
+            },
+            "description": "Retrieves the master list of all skills with multilingual names (`enName`, `hiName`, `mrName`), category, and audit user information (`createdBy`, `updatedBy`).\n\n**Controller**: `getAllSkills` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Master Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enName\": \"Plumber\",\n  \"hiName\": \"प्लम्बर\",\n  \"mrName\": \"प्लंबर\",\n  \"category\": \"Plumbing & Sanitation\",\n  \"description\": \"Pipe fitting, leak repair, and water fixture installation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/addskills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "addskills"]
+            },
+            "description": "Creates a new master skill with English, Hindi, and Marathi names and associated category.\n\n**Controller**: `addSkills` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Master Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enName\": \"Master Plumber\",\n  \"hiName\": \"मुख्य प्लम्बर\",\n  \"mrName\": \"मुख्य प्लंबर\",\n  \"category\": \"Plumbing & Sanitation\",\n  \"description\": \"Advanced plumbing and pipeline maintenance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/updateskills/{{skillId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "updateskills", "{{skillId}}"]
+            },
+            "description": "Updates an existing master skill's localized names, description, or category.\n\n**Controller**: `updateSkill` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Master Business Names",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"enName\": \"Electrical Contractor\",\n    \"hiName\": \"विद्युत ठेकेदार\",\n    \"mrName\": \"विद्युत कंत्राटदार\",\n    \"category\": \"Electrical\",\n    \"description\": \"Electrical wiring and panel installation services\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/addbusinessname",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "addbusinessname"]
+            },
+            "description": "Adds one or more business category types (single object or JSON array) into the master database.\n\n**Controller**: `addBusinessName` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Master Business Name",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enName\": \"Certified Electrical Contractor\",\n  \"hiName\": \"प्रमाणित विद्युत ठेकेदार\",\n  \"mrName\": \"प्रमाणित विद्युत कंत्राटदार\",\n  \"category\": \"Electrical\",\n  \"description\": \"Licensed commercial & domestic electrical work\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/public/updatebusinessname/{{businessId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "public", "updatebusinessname", "{{businessId}}"]
+            },
+            "description": "Updates localized names, category, or description for a master business type.\n\n**Controller**: `updateBusinessName` in `src/controllers/publicController.js`\n**Auth**: Bearer Token (`authenticateToken`)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

@@ -10,6 +10,7 @@
     "test-db": "node src/config/testDB.js",
     "activate-display": "node scripts/activateAllUsersUntilOct2026.js",
     "add-users": "node scripts/addUsers.js",
+    "update-password": "node scripts/updateUserPassword.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
