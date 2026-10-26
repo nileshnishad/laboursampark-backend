@@ -45,8 +45,14 @@ export const register = async (req, res) => {
       });
     }
 
+    // Always store mobile number with +91 prefix if 10 digits
+    let formattedMobile = mobile;
+    if (/^\d{10}$/.test(formattedMobile)) {
+      formattedMobile = "+91" + formattedMobile;
+    }
+
     // Check if user already exists
-    const duplicateConditions = [{ mobile }];
+    const duplicateConditions = [{ mobile }, { mobile: formattedMobile }];
     if (email) duplicateConditions.push({ email });
     const existingUser = await User.findOne({ $or: duplicateConditions });
 
@@ -58,19 +64,12 @@ export const register = async (req, res) => {
     }
 
     // Validate userType
-    const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin"];
+    const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin", "vendor", "user", "customer"];
     if (!validUserTypes.includes(userType.toLowerCase())) {
       return res.status(400).json({
         success: false,
-        message: "userType must be either 'labour', 'contractor', 'sub_contractor', 'admin' or 'super_admin'",
+        message: "userType must be either 'labour', 'contractor', 'sub_contractor', 'admin', 'super_admin', 'vendor', 'user' or 'customer'",
       });
-    }
-
-
-    // Always store mobile number with +91 prefix if 10 digits
-    let formattedMobile = mobile;
-    if (/^\d{10}$/.test(formattedMobile)) {
-      formattedMobile = "+91" + formattedMobile;
     }
 
     // Create new user with all fields from payload, but formatted mobile
@@ -136,9 +135,23 @@ export const register = async (req, res) => {
       }
     }
 
-    // Generate JWT token
+    // Generate session-bound JWT token
+    const sessionId = crypto.randomUUID();
+    const now = new Date();
+    user.lastLogin = now;
+    user.isLoggedIn = true;
+    user.activeSessionId = sessionId;
+    user.sessionStartedAt = now;
+    await user.save();
+
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      {
+        userId: user._id,
+        email: user.email,
+        mobile: user.mobile,
+        userType: user.userType,
+        sessionId,
+      },
       process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: "7d" }
     );
@@ -146,8 +159,10 @@ export const register = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "User registered successfully",
+      token,
       data: {
-        user: user.toJSON()
+        user: user.toJSON(),
+        token,
       },
     });
   } catch (error) {
@@ -181,11 +196,25 @@ export const login = async (req, res) => {
       });
     }
 
+    // Format mobile for query (supports both +919876543210 and 9876543210)
+    let formattedMobile = mobile;
+    if (mobile && /^\d{10}$/.test(mobile)) {
+      formattedMobile = "+91" + mobile;
+    }
+
+    const mobileQueries = [];
+    if (mobile) {
+      mobileQueries.push({ mobile });
+      if (formattedMobile !== mobile) {
+        mobileQueries.push({ mobile: formattedMobile });
+      }
+    }
+
     // Find user by email or mobile
     const user = await User.findOne({
       $or: [
         email && { email },
-        mobile && { mobile },
+        ...mobileQueries,
       ].filter(Boolean),
     }).select("+password");
 
@@ -1313,7 +1342,7 @@ export const adminUpdateUser = async (req, res) => {
 
     // Validate userType if being updated
     if (updates.userType) {
-      const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin"];
+      const validUserTypes = ["labour", "contractor", "sub_contractor", "admin", "super_admin", "vendor", "user", "customer"];
       if (!validUserTypes.includes(updates.userType.toLowerCase())) {
         return res.status(400).json({
           success: false,

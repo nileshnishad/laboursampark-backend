@@ -1,5 +1,21 @@
 import mongoose from "mongoose";
 import bcryptjs from "bcryptjs";
+import { VENDOR_BUSINESS_TYPES, KYC_STATUSES } from "../constants/vendorConstants.js";
+
+// Sub-schema for Vendor KYC documents
+const documentItemSchema = new mongoose.Schema({
+  number: { type: String, default: "" },
+  type: { type: String, default: "" },
+  documentUrl: { type: String, default: null },
+  status: { type: String, enum: ["verified", "pending", "not_uploaded"], default: "not_uploaded" }
+}, { _id: false });
+
+const vendorKYCSchema = new mongoose.Schema({
+  panCard: { type: documentItemSchema, default: () => ({}) },
+  gstCertificate: { type: documentItemSchema, default: () => ({}) },
+  businessRegistration: { type: documentItemSchema, default: () => ({}) },
+  addressProof: { type: documentItemSchema, default: () => ({}) }
+}, { _id: false });
 
 const userSchema = new mongoose.Schema(
   {
@@ -99,6 +115,20 @@ const userSchema = new mongoose.Schema(
     about:String,
     gstNumber: String,
     registrationNumber: String,
+    // Vendor Specific
+    businessType: {
+      type: String,
+      enum: VENDOR_BUSINESS_TYPES,
+    },
+    kycStatus: {
+      type: String,
+      enum: KYC_STATUSES,
+      default: "pending_review",
+    },
+    vendorDocuments: {
+      type: vendorKYCSchema,
+      default: () => ({}),
+    },
     // Labour Specific
     aadharNumber: String,
     businessLicenseUrl:String,

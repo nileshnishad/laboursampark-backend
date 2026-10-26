@@ -27,6 +27,7 @@ import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import fcmRoutes from "./routes/fcmRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import referralRoutes from "./referral/referral.routes.js";
+import vendorRoutes from "./routes/vendorRoutes.js";
 import connectDB from "./config/db.js";
 
 // ==========================================
@@ -209,6 +210,9 @@ app.use("/api/firebase", fcmRoutes);
 
 // Support Tickets Routes
 app.use("/api/tickets", ticketRoutes);
+
+// Vendor Portal Routes
+app.use("/api/vendor", vendorRoutes);
 
 // ==========================================
 // ❌ ERROR HANDLING MIDDLEWARE
