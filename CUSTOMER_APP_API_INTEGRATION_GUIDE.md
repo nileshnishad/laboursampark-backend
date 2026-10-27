@@ -253,3 +253,168 @@ curl --location --request POST 'http://localhost:9000/api/users/logout' \
 --header 'Authorization: Bearer <TOKEN>'
 ```
 
+---
+
+## 6. Workers & Workforce Discovery API (Labour, Contractor, Subcontractor)
+
+This endpoint is designed specifically for the **Customer App**. A logged-in customer passes their JWT token to search and filter service providers.
+
+> **STRICT SAFETY & FILTERING RULE**:
+> * **ALLOWED `userType` values ONLY**: `"labour"`, `"contractor"`, `"sub_contractor"`.
+> * **EXCLUDED**: `"admin"`, `"editor"`, `"super_admin"`, `"user"`, `"customer"`, and `"vendor"` are strictly prohibited from being returned in this API.
+
+### Endpoint Details
+* **Method**: `GET`
+* **URL**: `http://localhost:9000/api/users/workers` *(or alias: `http://localhost:9000/api/users/providers`)*
+* **Auth**: Bearer User Token (`Authorization: Bearer <CUSTOMER_JWT_TOKEN>`)
+
+### Available Query Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `userType` | String | `all` | Filter by role: `"labour"`, `"contractor"`, `"sub_contractor"`, comma-separated (`"labour,contractor"`), or `"all"` (returns all three). |
+| `search` | String | `null` | Free-text search across name, skills, bio, company/business name, location, and work types. |
+| `city` / `location` | String | `null` | Filter by city (case-insensitive substring match). |
+| `state` | String | `null` | Filter by state. |
+| `area` | String | `null` | Filter by area / neighborhood. |
+| `skills` | String | `null` | Filter by skill name(s) (e.g., `"Mason,Painter"` or `"Welder"`). |
+| `rating` / `minRating` | Number | `null` | Filter by minimum rating (e.g., `4` or `4.5`). |
+| `minRate` / `maxRate` | Number | `null` | Filter by hourly/daily/project rate range. |
+| `availability` | Boolean | `null` | Filter by `true` or `false`. |
+| `page` | Number | `1` | Page number for pagination. |
+| `limit` | Number | `20` | Items per page (max `50`). |
+
+---
+
+### cURL 1: Get All Workforce (Labour + Contractor + Subcontractor)
+
+```bash
+curl --location 'http://localhost:9000/api/users/workers?userType=all&page=1&limit=20' \
+--header 'Authorization: Bearer <CUSTOMER_JWT_TOKEN>'
+```
+
+---
+
+### cURL 2: Filter ONLY Labours
+
+```bash
+curl --location 'http://localhost:9000/api/users/workers?userType=labour&page=1&limit=20' \
+--header 'Authorization: Bearer <CUSTOMER_JWT_TOKEN>'
+```
+
+---
+
+### cURL 3: Filter ONLY Contractors
+
+```bash
+curl --location 'http://localhost:9000/api/users/workers?userType=contractor&page=1&limit=20' \
+--header 'Authorization: Bearer <CUSTOMER_JWT_TOKEN>'
+```
+
+---
+
+### cURL 4: Filter ONLY Sub-Contractors
+
+```bash
+curl --location 'http://localhost:9000/api/users/workers?userType=sub_contractor&page=1&limit=20' \
+--header 'Authorization: Bearer <CUSTOMER_JWT_TOKEN>'
+```
+
+---
+
+### cURL 5: Search by Skills, City & Rating
+
+```bash
+curl --location 'http://localhost:9000/api/users/workers?userType=labour&skills=Mason&city=Mumbai&minRating=4' \
+--header 'Authorization: Bearer <CUSTOMER_JWT_TOKEN>'
+```
+
+---
+
+### Example Success Response (`200 OK`)
+
+```json
+{
+  "success": true,
+  "message": "Workers retrieved successfully",
+  "data": {
+    "users": [
+      {
+        "_id": "67be567890abcdef12345678",
+        "fullName": "Suresh Kumar",
+        "email": "suresh.labour@example.com",
+        "mobile": "+919811122233",
+        "userType": "labour",
+        "userCode": "LS26000012",
+        "profilePhotoUrl": "https://storage.laboursampark.com/profiles/suresh.jpg",
+        "bio": "Experienced civil mason and plaster specialist with 8 years of on-site experience.",
+        "about": "Available for residential and commercial civil works.",
+        "skills": ["Masonry", "Plastering", "Brick Laying", "Concrete Work"],
+        "location": {
+          "city": "Mumbai",
+          "state": "Maharashtra",
+          "area": "Goregaon East",
+          "pincode": "400063"
+        },
+        "rating": 4.8,
+        "totalReviews": 34,
+        "completedJobs": 28,
+        "hourlyRate": 150,
+        "dayRate": 900,
+        "experience": "8 years",
+        "experienceYears": 8,
+        "availability": true,
+        "serviceCategories": ["Civil & Construction"],
+        "workTypes": ["Daily Wage", "Contract"],
+        "isVerified": true,
+        "businessName": null,
+        "companyName": null,
+        "createdAt": "2026-01-15T10:30:00.000Z"
+      },
+      {
+        "_id": "67be9876543210fedcba8765",
+        "fullName": "Rajesh Sharma",
+        "email": "rajesh@sharmabuilders.com",
+        "mobile": "+919822233344",
+        "userType": "contractor",
+        "userCode": "LS26000008",
+        "profilePhotoUrl": "https://storage.laboursampark.com/profiles/rajesh.jpg",
+        "bio": "Civil contractor undertaking residential renovation, tiling, and structural repairs.",
+        "skills": ["General Civil Works", "Structural Repairs", "Waterproofing"],
+        "location": {
+          "city": "Mumbai",
+          "state": "Maharashtra",
+          "area": "Andheri East",
+          "pincode": "400069"
+        },
+        "companyName": "Sharma Buildcon & Infra",
+        "businessName": "Sharma Buildcon",
+        "rating": 4.6,
+        "totalReviews": 52,
+        "completedJobs": 45,
+        "teamSize": "25-50 workers",
+        "dayRate": 12000,
+        "availability": true,
+        "isVerified": true,
+        "createdAt": "2026-01-10T08:20:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 2,
+      "totalPages": 1
+    },
+    "filters": {
+      "userType": ["labour", "contractor", "sub_contractor"],
+      "allowedTypes": ["labour", "contractor", "sub_contractor"],
+      "city": null,
+      "skills": null,
+      "rating": null,
+      "search": null
+    }
+  }
+}
+```
+
+

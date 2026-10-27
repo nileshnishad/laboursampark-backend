@@ -1,6 +1,6 @@
 import express from "express";
 import { register, login, logout, getProfile, updateProfile, forgotPassword, resetPassword, changePassword, configCheck, sendOTP, verifyOTP, resetPasswordWithOTP, getAllUsers, adminUpdateUser } from "../controllers/userController.js";
-import { getVisibleUsers, getLabours, getContractors } from "../controllers/discoveryController.js";
+import { getVisibleUsers, getLabours, getContractors, getWorkers } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint, isAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -63,6 +63,10 @@ router.post("/config-check", authenticateToken, configCheck);
 
 // GET /api/users/visible - Get visible users (contractors/labour) (PROTECTED)
 router.get("/visible", authenticateToken, getVisibleUsers);
+
+// GET /api/users/workers - Get Labour, Contractor & Subcontractor for Customer App (PROTECTED)
+router.get("/workers", authenticateToken, getWorkers);
+router.get("/providers", authenticateToken, getWorkers);
 
 // ==========================================
 // ADMIN ROUTES (admin/super_admin only)

@@ -190,10 +190,17 @@ export const getVisibleUsers = async (req, res) => {
       });
     }
 
-    // Determine which users to show based on current user's type
-    const targetUserType = currentUser.userType === "labour" ? "contractor" : "labour";
+    // Determine which users to show based on current user's type and query
+    let targetUserType;
+    if (req.query.userType && ["labour", "contractor", "sub_contractor"].includes(req.query.userType.toLowerCase())) {
+      targetUserType = req.query.userType.toLowerCase();
+    } else if (currentUser.userType === "user" || currentUser.userType === "customer") {
+      targetUserType = { $in: ["labour", "contractor", "sub_contractor"] };
+    } else {
+      targetUserType = currentUser.userType === "labour" ? "contractor" : "labour";
+    }
 
-    // Build filter: must have display=true and opposite userType
+    // Build filter: must have display=true and target userType
     const filter = {
       userType: targetUserType,
       display: true,
@@ -725,3 +732,214 @@ export const getContractors = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// 👷 GET WORKERS (Labour, Contractor, Subcontractor) FOR CUSTOMER APP
+// Protected API — Requires valid user JWT token
+// Excludes: admin, super_admin, editor, user, customer, vendor
+// ==========================================
+
+const buildWorkerResponse = (userData) => {
+  const experienceYears = extractExperienceYears(userData.experienceRange ?? userData.experience);
+
+  return {
+    _id: userData._id,
+    fullName: userData.fullName,
+    email: userData.email,
+    mobile: userData.mobile,
+    userType: userData.userType,
+    userCode: userData.userCode,
+    profilePhotoUrl: userData.profilePhotoUrl,
+    bio: userData.bio,
+    about: userData.about,
+    skills: userData.skills || [],
+    location: userData.location,
+    rating: userData.rating || 0,
+    totalReviews: userData.totalReviews || 0,
+    completedJobs: userData.completedJobs || 0,
+    hourlyRate: userData.hourlyRate,
+    dayRate: userData.dayRate,
+    projectRate: userData.projectRate,
+    minimumJobValue: userData.minimumJobValue,
+    experience: userData.experience,
+    experienceRange: userData.experienceRange,
+    experienceYears,
+    availability: userData.availability ?? true,
+    serviceCategories: userData.serviceCategories || [],
+    workTypes: userData.workTypes || [],
+    coverageArea: userData.coverageArea || [],
+    isVerified: userData.isVerified || false,
+    companyName: userData.companyName,
+    businessName: userData.businessName,
+    teamSize: userData.teamSize,
+    preferredContactMethod: userData.preferredContactMethod,
+    createdAt: userData.createdAt,
+  };
+};
+
+export const getWorkers = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      userType, // 'labour', 'contractor', 'sub_contractor', or comma-separated, or 'all'
+      search,
+      skills,
+      city,
+      state,
+      area,
+      location,
+      rating,
+      minRating,
+      minRate,
+      maxRate,
+      availability,
+    } = req.query;
+
+    const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    // Allowed workforce types ONLY — strictly excludes admin, editor, user, customer, vendor
+    const ALLOWED_WORKFORCE_TYPES = ["labour", "contractor", "sub_contractor"];
+
+    let targetTypes = ALLOWED_WORKFORCE_TYPES;
+
+    if (userType && String(userType).trim() !== "" && String(userType).toLowerCase() !== "all") {
+      const requestedTypes = String(userType)
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => ALLOWED_WORKFORCE_TYPES.includes(t));
+
+      // If user provided valid workforce type(s), use them
+      if (requestedTypes.length > 0) {
+        targetTypes = requestedTypes;
+      }
+    }
+
+    const filter = {
+      userType: targetTypes.length === 1 ? targetTypes[0] : { $in: targetTypes },
+      status: { $ne: "blocked" },
+    };
+
+    // Exclude the requesting user
+    if (req.userId) {
+      filter._id = { $ne: req.userId };
+    }
+
+    // Availability filter
+    if (availability !== undefined && availability !== null && availability !== "") {
+      filter.availability = String(availability).toLowerCase() === "true";
+    }
+
+    // Location filters
+    const searchCity = city || location;
+    if (searchCity && String(searchCity).trim() !== "") {
+      filter["location.city"] = { $regex: escapeRegex(String(searchCity).trim()), $options: "i" };
+    }
+    if (state && String(state).trim() !== "") {
+      filter["location.state"] = { $regex: escapeRegex(String(state).trim()), $options: "i" };
+    }
+    if (area && String(area).trim() !== "") {
+      filter["location.area"] = { $regex: escapeRegex(String(area).trim()), $options: "i" };
+    }
+
+    // Rating filter
+    const effectiveRating = minRating ?? rating;
+    if (effectiveRating !== undefined && effectiveRating !== null && String(effectiveRating).trim() !== "") {
+      const parsedRating = Number.parseFloat(effectiveRating);
+      if (!Number.isNaN(parsedRating)) {
+        filter.rating = { $gte: parsedRating };
+      }
+    }
+
+    // Rate filter
+    if (minRate || maxRate) {
+      const rateFilter = {};
+      if (minRate) rateFilter.$gte = Number.parseFloat(minRate);
+      if (maxRate) rateFilter.$lte = Number.parseFloat(maxRate);
+
+      filter.$or = [
+        { hourlyRate: rateFilter },
+        { dayRate: rateFilter },
+        { projectRate: rateFilter },
+      ];
+    }
+
+    // Skills filter
+    if (skills) {
+      const skillsArray = parseListParam(skills);
+      if (skillsArray.length > 0) {
+        const skillConditions = buildSkillMatchConditions(skillsArray);
+        if (skillConditions.length > 0) {
+          if (!filter.$and) filter.$and = [];
+          filter.$and.push({ $or: skillConditions });
+        }
+      }
+    }
+
+    // Search query
+    if (search && String(search).trim() !== "") {
+      const searchPattern = new RegExp(escapeRegex(String(search).trim()), "i");
+      const searchConditions = [
+        { fullName: searchPattern },
+        { skills: searchPattern },
+        { bio: searchPattern },
+        { about: searchPattern },
+        { companyName: searchPattern },
+        { businessName: searchPattern },
+        { "location.city": searchPattern },
+        { "location.area": searchPattern },
+        { "location.state": searchPattern },
+        { coverageArea: searchPattern },
+        { workTypes: searchPattern },
+      ];
+
+      if (!filter.$and) filter.$and = [];
+      filter.$and.push({ $or: searchConditions });
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .sort({ rating: -1, totalReviews: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(parsedLimit)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    const formattedUsers = users.map((u) => buildWorkerResponse(u));
+
+    return res.status(200).json({
+      success: true,
+      message: "Workers retrieved successfully",
+      data: {
+        users: formattedUsers,
+        pagination: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total,
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+        filters: {
+          userType: targetTypes.length === 1 ? targetTypes[0] : targetTypes,
+          allowedTypes: ALLOWED_WORKFORCE_TYPES,
+          city: searchCity || null,
+          skills: skills || null,
+          rating: effectiveRating ? Number.parseFloat(effectiveRating) : null,
+          search: search || null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get workers error:", error.name, error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while retrieving workers",
+      error: error.message,
+    });
+  }
+};
+
+export { getWorkers as getProviders };
+
