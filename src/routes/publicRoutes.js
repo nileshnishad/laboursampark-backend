@@ -1,6 +1,6 @@
 import  express from 'express';
 
-import { getSkills, getAllSkills, getAllSkillsName, addSkills, updateSkill, getAllBusinessName, addBusinessName, updateBusinessName, getDashboardStats, createMobileBanner, updateMobileBanner, getActiveMobileBanner, getAllMobileBanners, deleteMobileBanner } from '../controllers/publicController.js';
+import { listSkillsPaginated, listSkillCategories, adminListSkillsPaginated, getSkills, getAllSkills, getAllSkillsName, addSkills, updateSkill, getAllBusinessName, addBusinessName, updateBusinessName, getDashboardStats, createMobileBanner, updateMobileBanner, getActiveMobileBanner, getAllMobileBanners, deleteMobileBanner } from '../controllers/publicController.js';
 import { checkAppVersion, createOrUpdateAppVersion } from '../controllers/appVersionController.js';
 import { authenticateToken, isAdmin } from '../middleware/authMiddleware.js';
 
@@ -8,6 +8,9 @@ import { authenticateToken, isAdmin } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.get('/skills', getSkills);
+router.get('/skills/list', listSkillsPaginated);
+router.get('/skills/categories', listSkillCategories);
+router.get('/skills/admin/list', authenticateToken, isAdmin, adminListSkillsPaginated);
 router.get('/getallskillsname', getAllSkillsName);
 router.get('/getskills',authenticateToken, getAllSkills);
 router.post('/addskills', authenticateToken, addSkills);

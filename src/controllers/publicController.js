@@ -87,6 +87,127 @@ export const getSkills = async (req, res) => {
   }
 };
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildSkillPageQuery = (req) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const search = String(req.query.search || '').trim();
+  const category = String(req.query.category || '').trim();
+
+  const filter = {};
+  if (category) {
+    filter.category = category;
+  }
+  if (search) {
+    const regex = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [{ enName: regex }, { name: regex }, { hiName: regex }, { mrName: regex }];
+  }
+
+  return { page, limit, filter };
+};
+
+const buildPagination = (page, limit, total) => {
+  const totalPages = Math.max(Math.ceil(total / limit), 1);
+  return {
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+};
+
+// Public (customer app, labour app): paginated skills with all three languages.
+// Query: page, limit (max 100), search, category, lang (en|hi|mr)
+export const listSkillsPaginated = async (req, res) => {
+  try {
+    const { page, limit, filter } = buildSkillPageQuery(req);
+    const langMap = { hi: 'hiName', hindi: 'hiName', mr: 'mrName', marathi: 'mrName' };
+    const requestedLang = String(req.query.lang || req.query.flag || 'en').trim().toLowerCase();
+    const nameField = langMap[requestedLang] || 'enName';
+    const lang = nameField === 'hiName' ? 'hi' : nameField === 'mrName' ? 'mr' : 'en';
+
+    const [total, skills] = await Promise.all([
+      Skills.countDocuments(filter),
+      Skills.find(filter, { enName: 1, hiName: 1, mrName: 1, name: 1, category: 1 })
+        .sort({ enName: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    const items = skills.map((skill) => {
+      const enName = skill.enName || skill.name || '';
+      return {
+        id: skill._id,
+        name: (skill[nameField] || '').trim() || enName,
+        enName,
+        hiName: skill.hiName || '',
+        mrName: skill.mrName || '',
+        category: skill.category || '',
+      };
+    });
+
+    res.json({ success: true, lang, ...buildPagination(page, limit, total), skills: items });
+  } catch (error) {
+    console.error('Error listing skills:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch skills' });
+  }
+};
+
+// Public: distinct skill categories with skill counts.
+export const listSkillCategories = async (req, res) => {
+  try {
+    const rows = await Skills.aggregate([
+      { $match: { category: { $exists: true, $nin: [null, ''] } } },
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+    res.json({
+      success: true,
+      total: rows.length,
+      categories: rows.map((row) => ({ category: row._id, count: row.count })),
+    });
+  } catch (error) {
+    console.error('Error listing skill categories:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch skill categories' });
+  }
+};
+
+// Admin portal: paginated full skill records.
+// Query: page, limit (max 100), search, category
+export const adminListSkillsPaginated = async (req, res) => {
+  try {
+    const { page, limit, filter } = buildSkillPageQuery(req);
+
+    const [total, skills] = await Promise.all([
+      Skills.countDocuments(filter),
+      Skills.find(filter)
+        .sort({ enName: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('createdBy', 'fullName')
+        .populate('updatedBy', 'fullName')
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      ...buildPagination(page, limit, total),
+      skills: skills.map((skill) => ({
+        ...skill,
+        createdByName: skill.createdBy?.fullName || null,
+        updatedByName: skill.updatedBy?.fullName || null,
+      })),
+    });
+  } catch (error) {
+    console.error('Error listing skills for admin:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch skills' });
+  }
+};
+
 export const getAllSkills = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
