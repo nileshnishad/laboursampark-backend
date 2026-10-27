@@ -3,6 +3,8 @@ import { register, login, logout, getProfile, updateProfile, forgotPassword, res
 import { getVisibleUsers, getLabours, getContractors, getWorkers } from "../controllers/discoveryController.js";
 import { authenticateToken, publicEndpoint, isAdmin } from "../middleware/authMiddleware.js";
 
+import { addFavoriteWorker, removeFavoriteWorker, getFavoriteWorkers } from "../controllers/favoriteController.js";
+
 const router = express.Router();
 
 // ==========================================
@@ -65,6 +67,9 @@ router.post("/config-check", authenticateToken, configCheck);
 router.get("/visible", authenticateToken, getVisibleUsers);
 
 // GET /api/users/workers - Get Labour, Contractor & Subcontractor for Customer App (PROTECTED)
+router.post("/favorites", authenticateToken, addFavoriteWorker);
+router.get("/favorites", authenticateToken, getFavoriteWorkers);
+router.delete("/favorites/:workerId", authenticateToken, removeFavoriteWorker);
 router.get("/workers", authenticateToken, getWorkers);
 router.get("/providers", authenticateToken, getWorkers);
 

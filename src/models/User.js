@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema(
     teamSize: String,
     termsAgreed:{type:Boolean, default:false},
     skills: [String],
+    favoriteWorkers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     coverageArea:[String],
     servicesOffered: [String],
     serviceCover: [String], // e.g., "local", "statewide", "national", "international"
